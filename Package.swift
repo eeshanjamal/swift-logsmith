@@ -9,8 +9,17 @@ let swiftSettings: Array<SwiftSetting> = [
     .enableUpcomingFeature("InternalImportsByDefault"),
 ]
 
+let supportedPlatforms: Array<SupportedPlatform> = [
+    .macOS(.v11),
+    .iOS(.v14),
+    .tvOS(.v14),
+    .watchOS(.v7),
+    .visionOS(.v1),
+]
+
 let package = Package(
     name: "swift-logsmith",
+    platforms: supportedPlatforms,
     products: [
         // Products define the executables and libraries a package produces, making them visible to other packages.
         .library(
