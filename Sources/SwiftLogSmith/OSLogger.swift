@@ -24,40 +24,27 @@ final class OSLogger: NSObject, ILogger {
         super.init()
     }
     
-    func log(_ message: String) {
-        logger.log("\(message)")
-    }
-    
-    func trace(_ message: String) {
-        logger.trace("\(message)")
-    }
-    
-    func debug(_ message: String) {
-        logger.debug("\(message)")
-    }
-    
-    func notice(_ message: String) {
-        logger.notice("\(message)")
-    }
-    
-    func info(_ message: String) {
-        logger.info("\(message)")
-    }
-    
-    func warning(_ message: String) {
-        logger.warning("\(message)")
-    }
-    
-    func error(_ message: String) {
-        logger.error("\(message)")
-    }
-    
-    func critical(_ message: String) {
-        logger.critical("\(message)")
-    }
-    
-    func fault(_ message: String) {
-        logger.fault("\(message)")
+    func log(type: LogType, message: String) {
+        switch type {
+        case .none:
+            logger.log("\(message)")
+        case .notice:
+            logger.notice("\(message)")
+        case .info:
+            logger.info("\(message)")
+        case .debug:
+            logger.debug("\(message)")
+        case .trace:
+            logger.trace("\(message)")
+        case .warning:
+            logger.warning("\(message)")
+        case .error:
+            logger.error("\(message)")
+        case .fault:
+            logger.fault("\(message)")
+        case .critical:
+            logger.critical("\(message)")
+        }
     }
     
 }

@@ -12,19 +12,27 @@ import Foundation
 final class LogManager: NSObject, ILogger, @unchecked Sendable {
     
     private var loggers: Array<any ILogger>
+    private var logPrefixes: LogTagCollection
+    private var logPostfixes: LogTagCollection
     private let queue = DispatchQueue(label: "com.swift.logman")
     
     private override init() {
         loggers = []
+        logPrefixes = LogTagCollection()
+        logPostfixes = LogTagCollection()
         super.init()
     }
     
     public init(defaultLogger: any ILogger) {
         loggers = [defaultLogger]
+        logPrefixes = LogTagCollection()
+        logPostfixes = LogTagCollection()
         super.init()
     }
     
-    public func addLogger(_ newLogger: any ILogger,_ completion: (@Sendable(Bool) -> Void)? = nil) {
+    //MARK: Logger API's
+    
+    public func addLogger(newLogger: any ILogger, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
             let newLoggerType = type(of: newLogger)
             guard !self.loggers.contains(where: { type(of: $0) == newLoggerType}) else {
@@ -36,7 +44,7 @@ final class LogManager: NSObject, ILogger, @unchecked Sendable {
         }
     }
     
-    public func removeLogger(_ logger: any ILogger,_ completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func removeLogger(logger: any ILogger, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
             let loggerType = type(of: logger)
             if let index = self.loggers.firstIndex(where: {type(of: $0) == loggerType}) {
@@ -49,42 +57,63 @@ final class LogManager: NSObject, ILogger, @unchecked Sendable {
         }
     }
     
+    //MARK: Log Prefix API's
+    
+    public func addLogPrefix(logPrefix: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+        queue.async {
+            self.logPrefixes.addTag(logPrefix, completion)
+        }
+    }
+    
+    public func  removeLogPrefix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
+        queue.async {
+            self.logPrefixes.removeTag(identifier, completion)
+        }
+    }
+    
+    //MARK: Log Postfix API's
+    
+    public func addLogPostfix(logPostfix: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+        queue.async {
+            self.logPostfixes.addTag(logPostfix, completion)
+        }
+    }
+    
+    public func  removeLogPostfix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
+        queue.async {
+            self.logPostfixes.removeTag(identifier, completion)
+        }
+    }
+    
     //MARK: ILogger protocol implmentation
     
-    func log(_ message: String) {
-        queue.async { self.loggers.forEach { $0.log(message) } }
+    func log(type: LogType, message: String) {
+        queue.async {
+            self.addOnLogMessage(logType: type, message: message) { finalMessage in
+                self.loggers.forEach { logger in
+                    logger.log(type: type, message: finalMessage)
+                }
+            }
+        }
     }
     
-    func trace(_ message: String) {
-        queue.async { self.loggers.forEach { $0.trace(message) } }
-    }
+    //MARK: Private API's
     
-    func debug(_ message: String) {
-        queue.async { self.loggers.forEach { $0.debug(message) } }
-    }
-    
-    func notice(_ message: String) {
-        queue.async { self.loggers.forEach { $0.notice(message) } }
-    }
-    
-    func info(_ message: String) {
-        queue.async { self.loggers.forEach { $0.info(message) } }
-    }
-    
-    func warning(_ message: String) {
-        queue.async { self.loggers.forEach { $0.warning(message) } }
-    }
-    
-    func error(_ message: String) {
-        queue.async { self.loggers.forEach { $0.error(message) } }
-    }
-    
-    func critical(_ message: String) {
-        queue.async { self.loggers.forEach { $0.critical(message) } }
-    }
-    
-    func fault(_ message: String) {
-        queue.async { self.loggers.forEach { $0.fault(message) } }
+    private func addOnLogMessage(logType: LogType? = nil, message: String, completion: @escaping (@Sendable(String) -> Void)) {
+        logPrefixes.toNoTypeString { noTypePrefix in
+            self.logPostfixes.toNoTypeString { noTypePostfix in
+                if let logType = logType {
+                    self.logPrefixes.toTypeString(logType: logType) { typePrefix in
+                        self.logPostfixes.toTypeString(logType: logType) { typePostfix in
+                            completion("\(noTypePrefix) \(typePrefix) \(message) \(typePostfix) \(noTypePostfix)")
+                        }
+                    }
+                }
+                else {
+                    completion("\(noTypePrefix) \(message) \(noTypePostfix)")
+                }
+            }
+        }
     }
     
 }
