@@ -29,12 +29,20 @@ final class LogSmith: NSObject, @unchecked Sendable {
         }
     }
     
-    public static func addLogger(newLogger: any ILogger,_ completion: (@Sendable(Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.addLogger(newLogger: newLogger, completion: completion) }
+    public static func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none,_ completion: (@Sendable(Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.addLogger(newLogger: newLogger, minLogLevel: minLogLevel, minLogType: minLogType, completion: completion) }
     }
     
     public static func removeLogger(logger: any ILogger,_ completion: (@Sendable(Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.removeLogger(logger: logger, completion: completion) }
+    }
+    
+    public static func setMinimumLogLevel(_ logLevel: LogLevel) {
+        shared.queue.async { shared.defaultManager.setMinimumLogLevel(logLevel)}
+    }
+    
+    public static func setMinimumLogType(_ logType: LogType) {
+        shared.queue.async { shared.defaultManager.setMinimumLogType(logType)}
     }
     
     public static func log(_ message: String) {
@@ -152,13 +160,6 @@ final class LogTag: NSObject, @unchecked Sendable {
     let identifier: String
     let logType: LogType?
     let value: String
-    
-    private override init() {
-        identifier = ""
-        logType = nil
-        value = ""
-        super.init()
-    }
     
     init(identifier: String, value: String, logType: LogType? = nil){
         self.identifier = identifier
