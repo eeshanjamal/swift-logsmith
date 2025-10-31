@@ -20,7 +20,6 @@ import Foundation
     LogSmith.logN("Sample Log Notice")
     LogSmith.logT("Sample Log Trace")
     LogSmith.logW("Sample Log Warning")
-}
 
     // Write your test here and use APIs like `#expect(...)` to check expected conditions.
 }
