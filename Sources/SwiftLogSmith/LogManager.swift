@@ -8,20 +8,26 @@
 
 import Foundation
 
+@objc internal protocol LogManagerOperations: Sendable {
+    
+    @objc func addLogger(newLogger: any ILogger, minLogLevel: LogLevel, minLogType: LogType, completion: (@Sendable(Bool) -> Void)?)
+    @objc func removeLogger(logger: any ILogger, completion: (@Sendable(Bool) -> Void)?)
+    @objc func setMinimumLogLevel(_ logLevel: LogLevel)
+    @objc func setMinimumLogType(_ logType: LogType)
+}
+
 @objcMembers
-final class LogManager: NSObject, ILogger, @unchecked Sendable {
+final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @unchecked Sendable {
     
     private var loggerItems: Array<LoggerItem>
-    private var logPrefixes: LogTagCollection
-    private var logPostfixes: LogTagCollection
+    private let logTagger: LogTagger
     private let queue = DispatchQueue(label: "com.swift.logman")
     private var minLogLevel: LogLevel
     private var minLogType: LogType
     
     public init(defaultLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none) {
         self.loggerItems = [LoggerItem(logger: defaultLogger, minLogLevel: minLogLevel, minLogType: minLogType, isDefault: true)]
-        self.logPrefixes = LogTagCollection()
-        self.logPostfixes = LogTagCollection()
+        self.logTagger = LogTagger()
         self.minLogLevel = .default
         self.minLogType = .none
         super.init()
@@ -54,34 +60,6 @@ final class LogManager: NSObject, ILogger, @unchecked Sendable {
         }
     }
     
-    //MARK: Log Prefix API's
-    
-    public func addLogPrefix(logPrefix: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
-        queue.async {
-            self.logPrefixes.addTag(logPrefix, completion)
-        }
-    }
-    
-    public func  removeLogPrefix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
-        queue.async {
-            self.logPrefixes.removeTag(identifier, completion)
-        }
-    }
-    
-    //MARK: Log Postfix API's
-    
-    public func addLogPostfix(logPostfix: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
-        queue.async {
-            self.logPostfixes.addTag(logPostfix, completion)
-        }
-    }
-    
-    public func  removeLogPostfix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
-        queue.async {
-            self.logPostfixes.removeTag(identifier, completion)
-        }
-    }
-    
     //MARK: Set Log level and Log Type
     
     public func setMinimumLogLevel(_ logLevel: LogLevel) {
@@ -96,43 +74,67 @@ final class LogManager: NSObject, ILogger, @unchecked Sendable {
         }
     }
     
+    //MARK: Log message public API
     
-    //MARK: ILogger protocol implmentation
-    
-    func log(type: LogType, message: String) {
+    public func log(type: LogType, message: String) {
         queue.async {
             if type.logLevel.rawValue >= self.minLogLevel.rawValue && type.rawValue >= self.minLogType.rawValue {
-                self.addOnLogMessage(logType: type, message: message) { finalMessage in
+                self.embedTags(logTagger: self.logTagger, message: message, logType: type) { tagsEmbedMessage in
                     self.loggerItems.forEach { loggerItem in
                         if type.logLevel.rawValue >= loggerItem.minLogLevel.rawValue && type.rawValue >= loggerItem.minLogType.rawValue {
-                            loggerItem.logger.log(type: type, message: finalMessage)
+                            self.embedTags(logTagger: loggerItem.logger.logTagger, message: tagsEmbedMessage, logType: type) { finalMessage in
+                                loggerItem.logger.log(type: type, message: finalMessage)
+                            }
                         }
                     }
-                }
-            }
-            
-        }
-    }
-    
-    //MARK: Private API's
-    
-    private func addOnLogMessage(logType: LogType? = nil, message: String, completion: @escaping (@Sendable(String) -> Void)) {
-        logPrefixes.toNoTypeString { noTypePrefix in
-            self.logPostfixes.toNoTypeString { noTypePostfix in
-                if let logType = logType {
-                    self.logPrefixes.toTypeString(logType: logType) { typePrefix in
-                        self.logPostfixes.toTypeString(logType: logType) { typePostfix in
-                            completion("\(noTypePrefix) \(typePrefix) \(message) \(typePostfix) \(noTypePostfix)")
-                        }
-                    }
-                }
-                else {
-                    completion("\(noTypePrefix) \(message) \(noTypePostfix)")
                 }
             }
         }
     }
     
+    //MARK: Private operation API's
+    
+    private func embedTags(logTagger: LogTagger?, message: String, logType: LogType? = nil, completion: @escaping (@Sendable(String) -> Void)) {
+        
+        if let logTagger = logTagger {
+            logTagger.logPrefixValue(logType: logType) { prefixTags in
+                logTagger.logPostfixValue(logType: logType) { postfixTags in
+                    var finalValue = String()
+                    if !prefixTags.isEmpty {
+                        finalValue.append(" \(prefixTags)")
+                    }
+                    if !message.isEmpty {
+                        finalValue.append(" \(message)")
+                    }
+                    if !postfixTags.isEmpty {
+                        finalValue.append(" \(postfixTags)")
+                    }
+                    completion(finalValue.isEmpty ? finalValue : String(finalValue.dropFirst()))
+                }
+            }
+        }
+        else {
+            completion(message)
+        }
+    }
+    
+    //MARK: Log Tagger operations public API's
+    
+    public func addLogPrefix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
+        queue.async { self.logTagger.addLogPrefix(logTag: logTag, completion: completion) }
+    }
+    
+    public func removeLogPrefix(identifier: String, completion: (@Sendable (Bool) -> Void)? = nil) {
+        queue.async { self.logTagger.removeLogPrefix(identifier: identifier, completion: completion) }
+    }
+    
+    public func addLogPostfix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
+        queue.async { self.logTagger.addLogPostfix(logTag: logTag, completion: completion) }
+    }
+    
+    public func removeLogPostfix(identifier: String, completion: (@Sendable (Bool) -> Void)? = nil) {
+        queue.async { self.logTagger.removeLogPostfix(identifier: identifier, completion: completion) }
+    }
 }
 
 @objcMembers

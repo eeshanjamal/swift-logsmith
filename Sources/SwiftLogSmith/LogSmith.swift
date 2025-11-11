@@ -9,7 +9,7 @@
 import Foundation
 
 @objcMembers
-final class LogSmith: NSObject, @unchecked Sendable {
+final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unchecked Sendable {
     
     private static let shared = LogSmith()
     
@@ -23,27 +23,84 @@ final class LogSmith: NSObject, @unchecked Sendable {
             guard !logType.stringValue.isEmpty && !logType.symbolicValue.isEmpty else {
                 return
             }
-            defaultManager.addLogPrefix(logPrefix: LogTag(identifier: logType.stringValue,
-                                                          value: logType.symbolicValue,
-                                                          logType: logType))
+            addLogPrefix(logTag: LogTag(identifier: logType.stringValue, value: logType.symbolicValue,
+                                        logType: logType), completion: nil)
         }
     }
     
+    //MARK: Log Manager operations internal API's
+    
+    internal func addLogger(newLogger: any ILogger, minLogLevel: LogLevel, minLogType: LogType, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.addLogger(newLogger: newLogger, minLogLevel: minLogLevel, minLogType: minLogType, completion: completion) }
+    }
+    
+    internal func removeLogger(logger: any ILogger, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.removeLogger(logger: logger, completion: completion) }
+    }
+    
+    internal func setMinimumLogLevel(_ logLevel: LogLevel) {
+        queue.async { self.defaultManager.setMinimumLogLevel(logLevel)}
+    }
+    
+    internal func setMinimumLogType(_ logType: LogType) {
+        queue.async { self.defaultManager.setMinimumLogType(logType)}
+    }
+    
+    //MARK: Log Manager operations public API's
+    
     public static func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none,_ completion: (@Sendable(Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.addLogger(newLogger: newLogger, minLogLevel: minLogLevel, minLogType: minLogType, completion: completion) }
+        shared.addLogger(newLogger: newLogger, minLogLevel: minLogLevel, minLogType: minLogType, completion: completion)
     }
     
     public static func removeLogger(logger: any ILogger,_ completion: (@Sendable(Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.removeLogger(logger: logger, completion: completion) }
+        shared.removeLogger(logger: logger, completion: completion)
     }
     
     public static func setMinimumLogLevel(_ logLevel: LogLevel) {
-        shared.queue.async { shared.defaultManager.setMinimumLogLevel(logLevel)}
+        shared.setMinimumLogLevel(logLevel)
     }
     
     public static func setMinimumLogType(_ logType: LogType) {
-        shared.queue.async { shared.defaultManager.setMinimumLogType(logType)}
+        shared.setMinimumLogType(logType)
     }
+    
+    //MARK: Log Tagger operations internal API's
+    
+    internal func addLogPrefix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.addLogPrefix(logTag: logTag, completion: completion) }
+    }
+    
+    internal func removeLogPrefix(identifier: String, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.removeLogPrefix(identifier: identifier, completion: completion) }
+    }
+    
+    internal func addLogPostfix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.addLogPostfix(logTag: logTag, completion: completion) }
+    }
+    
+    internal func removeLogPostfix(identifier: String, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.removeLogPostfix(identifier: identifier, completion: completion) }
+    }
+    
+    //MARK: Log Tagger operations public API's
+    
+    public static func addLogPrefix(logTag: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+        shared.addLogPrefix(logTag: logTag, completion: completion)
+    }
+    
+    public static func removeLogPrefix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
+        shared.removeLogPrefix(identifier: identifier, completion: completion)
+    }
+    
+    public static func addLogPostfix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.addLogPostfix(logTag: logTag, completion: completion)
+    }
+    
+    public static func removeLogPostfix(identifier: String, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.removeLogPostfix(identifier: identifier, completion: completion)
+    }
+    
+    //MARK: Log public API's
     
     public static func log(_ message: String) {
         shared.queue.async { shared.defaultManager.log(type: .none, message: message) }
@@ -152,118 +209,5 @@ final class LogSmith: NSObject, @unchecked Sendable {
     case debug      = 2
     case error      = 3
     case fault      = 4
-}
-
-@objcMembers
-final class LogTag: NSObject, @unchecked Sendable {
-    
-    let identifier: String
-    let logType: LogType?
-    let value: String
-    
-    init(identifier: String, value: String, logType: LogType? = nil){
-        self.identifier = identifier
-        self.logType = logType
-        self.value = value
-        super.init()
-    }
-    
-}
-
-@objcMembers
-final class LogTagCollection: NSObject, @unchecked Sendable {
-    
-    private var logTags: Array<LogTag>
-    private let queue = DispatchQueue(label: "com.swift.logtag")
-    private var values: String
-    private var typeValues: [LogType? : String]
-    
-    override init() {
-        self.logTags = []
-        self.values = ""
-        self.typeValues = Dictionary()
-        super.init()
-    }
-    
-    init(_ logTags: Array<LogTag>) {
-        self.logTags = Array(logTags)
-        self.values = LogTagCollection.toStringValue(logTags: self.logTags)
-        self.typeValues = LogTagCollection.toTypeStringValue(logTags: self.logTags)
-        super.init()
-    }
-    
-    func toString(completion: @escaping (@Sendable(String) -> Void)) {
-        queue.async {
-            completion(self.values)
-        }
-    }
-    
-    func toNoTypeString(completion: @escaping (@Sendable(String) -> Void)) {
-        queue.async {
-            completion(self.typeValues[nil, default: ""])
-        }
-    }
-    
-    func toTypeString(logType: LogType, completion: @escaping (@Sendable(String) -> Void)) {
-        queue.async {
-            completion(self.typeValues[logType, default: ""])
-        }
-    }
-    
-    func addTag(_ logTag: LogTag,_ completion: (@Sendable(Bool) -> Void)? = nil) {
-        queue.async {
-            if self.logTags.first(where: {$0.identifier == logTag.identifier}) != nil {
-                completion?(false)
-            }
-            else {
-                self.logTags.append(logTag)
-                self.values = LogTagCollection.toStringValue(logTags: self.logTags)
-                self.typeValues = LogTagCollection.toTypeStringValue(logTags: self.logTags)
-                completion?(true)
-            }
-        }
-    }
-    
-    func removeTag(_ identifier: String,_ completion: (@Sendable(Bool) -> Void)? = nil) {
-        queue.async {
-            if let tagIndex = self.logTags.firstIndex(where: {$0.identifier == identifier}) {
-                self.logTags.remove(at: tagIndex)
-                self.values = LogTagCollection.toStringValue(logTags: self.logTags)
-                self.typeValues = LogTagCollection.toTypeStringValue(logTags: self.logTags)
-                completion?(true)
-            }
-            else {
-                completion?(false)
-            }
-        }
-    }
-    
-    private static func toStringValue(logTags: Array<LogTag>) -> String {
-        var valueBuilder = ""
-        logTags.forEach { valueBuilder.append(formattedTagValue($0))  }
-        return finalValue(inputValue: valueBuilder)
-    }
-    
-    private static func toTypeStringValue(logTags: Array<LogTag>) -> [LogType? : String] {
-        var typeValues = [LogType? : String]()
-        logTags.forEach { logTag in
-            let typeValue = typeValues[logTag.logType, default: ""].appending(formattedTagValue(logTag))
-            typeValues.updateValue(typeValue, forKey: logTag.logType)
-        }
-        typeValues.keys.forEach { logType in
-            typeValues.updateValue(finalValue(inputValue: typeValues[logType, default: ""]), forKey: logType)
-        }
-        return typeValues
-    }
-    
-    private static func formattedTagValue(_ logTag: LogTag) -> String {
-        return " [\(logTag.value)]"
-    }
-    
-    private static func finalValue(inputValue: String) -> String {
-        return inputValue.isEmpty ? inputValue : String(inputValue.dropFirst())
-    }
-    
-    
 }
 
