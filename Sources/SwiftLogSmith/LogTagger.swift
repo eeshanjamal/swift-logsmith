@@ -24,7 +24,7 @@ final class LogTagger: NSObject, LogTaggerOperations, @unchecked Sendable {
     private let queue: DispatchQueue
     
     override init() {
-        queue = DispatchQueue(label: "com.swift.logtag")
+        queue = DispatchQueue(label: "com.swift.logtag.\(NSUUID().uuidString)")
         logPrefixes = LogTagCollection()
         logPostfixes = LogTagCollection()
         super.init()

@@ -21,11 +21,12 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     
     private var loggerItems: Array<LoggerItem>
     private let logTagger: LogTagger
-    private let queue = DispatchQueue(label: "com.swift.logman")
+    private let queue: DispatchQueue
     private var minLogLevel: LogLevel
     private var minLogType: LogType
     
     public init(defaultLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none) {
+        self.queue = DispatchQueue(label: "com.swift.logman.\(NSUUID().uuidString)")
         self.loggerItems = [LoggerItem(logger: defaultLogger, minLogLevel: minLogLevel, minLogType: minLogType, isDefault: true)]
         self.logTagger = LogTagger()
         self.minLogLevel = .default
