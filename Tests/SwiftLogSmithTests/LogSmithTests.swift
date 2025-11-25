@@ -12,7 +12,7 @@ import Foundation
 
 @Test func logSmithLog() async throws {
     LogSmith.log("Sample Log")
-    LogSmith.logC("Sample Log Critical")
+    LogSmith.logC("Sample Log Critical", metadata: ["error": "404", "description": "Page not found"])
     LogSmith.logD("Sample Log Debug")
     LogSmith.logE("Sample Log Error")
     LogSmith.logF("Sample Log Fault")

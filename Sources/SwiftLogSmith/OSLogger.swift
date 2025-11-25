@@ -24,26 +24,27 @@ final class OSLogger: NSObject, ILogger {
         super.init()
     }
     
-    func log(type: LogType, message: String) {
-        switch type {
+    func log(message: LogMessage) {
+        switch message.logType {
+        case .undefined: break //Nothing need to be done here
         case .none:
-            logger.log("\(message)")
+            logger.log("\(message.completeMessage)")
         case .notice:
-            logger.notice("\(message)")
+            logger.notice("\(message.completeMessage)")
         case .info:
-            logger.info("\(message)")
+            logger.info("\(message.completeMessage)")
         case .debug:
-            logger.debug("\(message)")
+            logger.debug("\(message.completeMessage)")
         case .trace:
-            logger.trace("\(message)")
+            logger.trace("\(message.completeMessage)")
         case .warning:
-            logger.warning("\(message)")
+            logger.warning("\(message.completeMessage)")
         case .error:
-            logger.error("\(message)")
+            logger.error("\(message.completeMessage)")
         case .fault:
-            logger.fault("\(message)")
+            logger.fault("\(message.completeMessage)")
         case .critical:
-            logger.critical("\(message)")
+            logger.critical("\(message.completeMessage)")
         }
     }
     

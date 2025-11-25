@@ -10,9 +10,9 @@ import Foundation
 
 @objc internal protocol LogTaggerOperations: Sendable {
 
-    @objc func addLogPrefix(logTag: LogTag, completion: (@Sendable(Bool) -> Void)?)
+    @objc func addLogPrefix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
     @objc func removeLogPrefix(identifier: String, completion: (@Sendable(Bool) -> Void)?)
-    @objc func addLogPostfix(logTag: LogTag, completion: (@Sendable(Bool) -> Void)?)
+    @objc func addLogPostfix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
     @objc func removeLogPostfix(identifier: String, completion: (@Sendable(Bool) -> Void)?)
 }
 
@@ -32,7 +32,7 @@ final class LogTagger: NSObject, LogTaggerOperations, @unchecked Sendable {
     
     //MARK: Log Prefix API's
     
-    public func addLogPrefix(logTag: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func addLogPrefix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
             let result = self.logPrefixes.addTag(logTag)
             completion?(result)
@@ -46,26 +46,15 @@ final class LogTagger: NSObject, LogTaggerOperations, @unchecked Sendable {
         }
     }
     
-    public func logPrefixValue(logType: LogType? = nil, completion: @escaping (@Sendable(String) -> Void)) {
+    public func logPrefixTags(logType: LogType, completion: @escaping (@Sendable([any LogTag]) -> Void)) {
         queue.async {
-            var prefixValue = String()
-            let noTypePrefixValue = self.logPrefixes.toNoTypeString()
-            if !noTypePrefixValue.isEmpty {
-                prefixValue.append(" \(noTypePrefixValue)")
-            }
-            if let logType = logType {
-                let typePrefixValue = self.logPrefixes.toTypeString(logType: logType)
-                if !typePrefixValue.isEmpty {
-                    prefixValue.append(" \(typePrefixValue)")
-                }
-            }
-            completion(prefixValue.isEmpty ? prefixValue : String(prefixValue.dropFirst()))
+            completion(self.prefixTags(logType: logType))
         }
     }
     
     //MARK: Log Postfix API's
     
-    public func addLogPostfix(logTag: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func addLogPostfix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
             let result = self.logPostfixes.addTag(logTag)
             completion?(result)
@@ -79,80 +68,49 @@ final class LogTagger: NSObject, LogTaggerOperations, @unchecked Sendable {
         }
     }
     
-    public func logPostfixValue(logType: LogType? = nil, completion: @escaping (@Sendable(String) -> Void)) {
+    public func logPostfixTags(logType: LogType, completion: @escaping (@Sendable([any LogTag]) -> Void)) {
         queue.async {
-            var postfixValue = String()
-            let noTypePostfixValue = self.logPostfixes.toNoTypeString()
-            if !noTypePostfixValue.isEmpty {
-                postfixValue.append(" \(noTypePostfixValue)")
-            }
-            if let logType = logType {
-                let typePostfixValue = self.logPostfixes.toTypeString(logType: logType)
-                if !typePostfixValue.isEmpty {
-                    postfixValue.append(" \(typePostfixValue)")
-                }
-            }
-            completion(postfixValue.isEmpty ? postfixValue : String(postfixValue.dropFirst()))
+            completion(self.postfixTags(logType: logType))
         }
+    }
+    
+    //MARK: Other API's
+    
+    public func logTags(logType: LogType, completion: @escaping (@Sendable([any LogTag], [any LogTag]) -> Void)) {
+        queue.async {
+            completion(self.prefixTags(logType: logType), self.postfixTags(logType: logType))
+        }
+    }
+    
+    private func prefixTags(logType: LogType) -> [any LogTag] {
+        return logPrefixes.logTags.filter { $0.logType == .undefined || $0.logType == logType }
+    }
+    
+    private func postfixTags(logType: LogType) -> [any LogTag] {
+        return logPostfixes.logTags.filter { $0.logType == .undefined || $0.logType == logType }
     }
 }
 
-@objcMembers
-final class LogTag: NSObject, @unchecked Sendable {
-    
-    let identifier: String
-    let logType: LogType?
-    let value: String
-    
-    init(identifier: String, value: String, logType: LogType? = nil){
-        self.identifier = identifier
-        self.logType = logType
-        self.value = value
-        super.init()
-    }    
-}
-
-@objcMembers
 private final class LogTagCollection: NSObject, @unchecked Sendable {
     
-    private var logTags: Array<LogTag>
-    private var values: String
-    private var typeValues: [LogType? : String]
+    var logTags: Array<any LogTag>
     
     override init() {
         self.logTags = []
-        self.values = ""
-        self.typeValues = Dictionary()
         super.init()
     }
     
-    init(_ logTags: Array<LogTag>) {
+    init(_ logTags: Array<any LogTag>) {
         self.logTags = Array(logTags)
-        self.values = LogTagCollection.toStringValue(logTags: self.logTags)
-        self.typeValues = LogTagCollection.toTypeStringValue(logTags: self.logTags)
         super.init()
     }
     
-    func toString() -> String {
-        return self.values
-    }
-    
-    func toNoTypeString() -> String {
-        return self.typeValues[nil, default: ""]
-    }
-    
-    func toTypeString(logType: LogType) -> String {
-        return self.typeValues[logType, default: ""]
-    }
-    
-    func addTag(_ logTag: LogTag) -> Bool {
+    func addTag(_ logTag: any LogTag) -> Bool {
         if self.logTags.first(where: {$0.identifier == logTag.identifier}) != nil {
             return false
         }
         else {
             self.logTags.append(logTag)
-            self.values = LogTagCollection.toStringValue(logTags: self.logTags)
-            self.typeValues = LogTagCollection.toTypeStringValue(logTags: self.logTags)
             return true
         }
     }
@@ -160,8 +118,6 @@ private final class LogTagCollection: NSObject, @unchecked Sendable {
     func removeTag(_ identifier: String) -> Bool {
         if let tagIndex = self.logTags.firstIndex(where: {$0.identifier == identifier}) {
             self.logTags.remove(at: tagIndex)
-            self.values = LogTagCollection.toStringValue(logTags: self.logTags)
-            self.typeValues = LogTagCollection.toTypeStringValue(logTags: self.logTags)
             return true
         }
         else {
@@ -169,30 +125,5 @@ private final class LogTagCollection: NSObject, @unchecked Sendable {
         }
     }
     
-    private static func toStringValue(logTags: Array<LogTag>) -> String {
-        var valueBuilder = ""
-        logTags.forEach { valueBuilder.append(formattedTagValue($0))  }
-        return finalValue(inputValue: valueBuilder)
-    }
-    
-    private static func toTypeStringValue(logTags: Array<LogTag>) -> [LogType? : String] {
-        var typeValues = [LogType? : String]()
-        logTags.forEach { logTag in
-            let typeValue = typeValues[logTag.logType, default: ""].appending(formattedTagValue(logTag))
-            typeValues.updateValue(typeValue, forKey: logTag.logType)
-        }
-        typeValues.keys.forEach { logType in
-            typeValues.updateValue(finalValue(inputValue: typeValues[logType, default: ""]), forKey: logType)
-        }
-        return typeValues
-    }
-    
-    private static func formattedTagValue(_ logTag: LogTag) -> String {
-        return " [\(logTag.value)]"
-    }
-    
-    private static func finalValue(inputValue: String) -> String {
-        return inputValue.isEmpty ? inputValue : String(inputValue.dropFirst())
-    }
 }
 

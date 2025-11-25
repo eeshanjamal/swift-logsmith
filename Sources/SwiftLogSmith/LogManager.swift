@@ -77,14 +77,14 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     
     //MARK: Log message public API
     
-    public func log(type: LogType, message: String) {
+    public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
         queue.async {
-            if type.logLevel.rawValue >= self.minLogLevel.rawValue && type.rawValue >= self.minLogType.rawValue {
-                self.embedTags(logTagger: self.logTagger, message: message, logType: type) { tagsEmbedMessage in
+            if logType.logLevel.rawValue >= self.minLogLevel.rawValue && logType.rawValue >= self.minLogType.rawValue {
+                self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerPrefixTags, managerPostfixTags in
                     self.loggerItems.forEach { loggerItem in
-                        if type.logLevel.rawValue >= loggerItem.minLogLevel.rawValue && type.rawValue >= loggerItem.minLogType.rawValue {
-                            self.embedTags(logTagger: loggerItem.logger.logTagger, message: tagsEmbedMessage, logType: type) { finalMessage in
-                                loggerItem.logger.log(type: type, message: finalMessage)
+                        if logType.logLevel.rawValue >= loggerItem.minLogLevel.rawValue && logType.rawValue >= loggerItem.minLogType.rawValue {
+                            self.extractTags(logTagger: loggerItem.logger.logTagger, logType: logType, fileId: fileId, function: function, line: line) { loggerPrefixTags, loggerPostfixTags in
+                                loggerItem.logger.log(message: LogMessage(message: message, logType: logType, prefixTags: managerPrefixTags+loggerPrefixTags, postfixTags: managerPostfixTags+loggerPostfixTags, metadata: metadata))
                             }
                         }
                     }
@@ -95,33 +95,22 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     
     //MARK: Private operation API's
     
-    private func embedTags(logTagger: LogTagger?, message: String, logType: LogType? = nil, completion: @escaping (@Sendable(String) -> Void)) {
-        
+    private func extractTags(logTagger: LogTagger?, logType: LogType, fileId: StaticString, function: StaticString, line: UInt, completion: @escaping (@Sendable([Tag], [Tag]) -> Void)) {
         if let logTagger = logTagger {
-            logTagger.logPrefixValue(logType: logType) { prefixTags in
-                logTagger.logPostfixValue(logType: logType) { postfixTags in
-                    var finalValue = String()
-                    if !prefixTags.isEmpty {
-                        finalValue.append(" \(prefixTags)")
-                    }
-                    if !message.isEmpty {
-                        finalValue.append(" \(message)")
-                    }
-                    if !postfixTags.isEmpty {
-                        finalValue.append(" \(postfixTags)")
-                    }
-                    completion(finalValue.isEmpty ? finalValue : String(finalValue.dropFirst()))
-                }
+            logTagger.logTags(logType: logType) { prefixTags, postfixTags in
+                let tagExtractor = LogTagsExtractor()
+                completion(tagExtractor.extract(logTags: prefixTags, fileId: fileId, function: function, line: line),
+                           tagExtractor.extract(logTags: postfixTags, fileId: fileId, function: function, line: line))
             }
         }
         else {
-            completion(message)
+            completion([], [])
         }
     }
     
     //MARK: Log Tagger operations public API's
     
-    public func addLogPrefix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
+    public func addLogPrefix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
         queue.async { self.logTagger.addLogPrefix(logTag: logTag, completion: completion) }
     }
     
@@ -129,13 +118,65 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
         queue.async { self.logTagger.removeLogPrefix(identifier: identifier, completion: completion) }
     }
     
-    public func addLogPostfix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
+    public func addLogPostfix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
         queue.async { self.logTagger.addLogPostfix(logTag: logTag, completion: completion) }
     }
     
     public func removeLogPostfix(identifier: String, completion: (@Sendable (Bool) -> Void)? = nil) {
         queue.async { self.logTagger.removeLogPostfix(identifier: identifier, completion: completion) }
     }
+}
+
+private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
+    
+    private var tags = [Tag]()
+    private var fileId = ""
+    private var function = ""
+    private var line = 0
+    
+    func extract(logTags: [any LogTag], fileId: StaticString, function: StaticString, line: UInt) -> [Tag] {
+        self.fileId = "\(fileId)"
+        self.function = "\(function)"
+        self.line = Int(line)
+        tags.removeAll()
+        logTags.forEach { logTag in
+            logTag.visit(logTagVisitor: self)
+        }
+        return tags
+    }
+    
+    func visit(logInternalTag: LogInternalTag) {
+        tags.append(Tag(key: logInternalTag.identifier, value: logInternalTag.value))
+    }
+    
+    func visit(logExternalTag: LogExternalTag) {
+        let value: String
+        switch logExternalTag.systemTagType {
+        case .file:
+            value = fileId
+        case .function:
+            value = function
+        case .line:
+            value = "\(line)"
+        case .threadName:
+            value = Utils.threadName()
+        }
+        tags.append(Tag(key: logExternalTag.identifier, value: value))
+    }
+}
+
+private final class Utils {
+    
+    static func threadName() -> String {
+        if Thread.isMainThread {
+            return "main"
+        }
+        else {
+            let name = __dispatch_queue_get_label(nil)
+            return String(cString: name, encoding: .utf8) ?? Thread.current.name ?? "unknown"
+        }
+    }
+    
 }
 
 @objcMembers
@@ -153,5 +194,4 @@ private final class LoggerItem: NSObject, @unchecked Sendable {
         self.isDefault = isDefault
         super.init()
     }
-    
 }

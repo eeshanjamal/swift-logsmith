@@ -18,12 +18,25 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     private override init() {
         super.init()
+        
+        //Add date tag for all logs
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-mm-dd HH:mm:ss.SSS"
+        addLogPrefix(logTag: LogInternalTag(identifier: "Date", valueProvider: {
+            dateFormatter.string(from: Date())
+        }), completion: nil)
+        
+        //Add System tags
+        addLogPrefix(logTag: LogExternalTag(systemTagType: .file), completion: nil)
+        addLogPrefix(logTag: LogExternalTag(systemTagType: .function), completion: nil)
+        addLogPrefix(logTag: LogExternalTag(systemTagType: .line), completion: nil)
+        
         //Add symbolic prefix for all log types
         LogType.allCases.forEach { logType in
             guard !logType.stringValue.isEmpty && !logType.symbolicValue.isEmpty else {
                 return
             }
-            addLogPrefix(logTag: LogTag(identifier: logType.stringValue, value: logType.symbolicValue,
+            addLogPrefix(logTag: LogInternalTag(identifier: logType.stringValue, value: logType.symbolicValue,
                                         logType: logType), completion: nil)
         }
     }
@@ -66,7 +79,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     //MARK: Log Tagger operations internal API's
     
-    internal func addLogPrefix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)?) {
+    internal func addLogPrefix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)?) {
         queue.async { self.defaultManager.addLogPrefix(logTag: logTag, completion: completion) }
     }
     
@@ -74,7 +87,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
         queue.async { self.defaultManager.removeLogPrefix(identifier: identifier, completion: completion) }
     }
     
-    internal func addLogPostfix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)?) {
+    internal func addLogPostfix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)?) {
         queue.async { self.defaultManager.addLogPostfix(logTag: logTag, completion: completion) }
     }
     
@@ -84,7 +97,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     //MARK: Log Tagger operations public API's
     
-    public static func addLogPrefix(logTag: LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public static func addLogPrefix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
         shared.addLogPrefix(logTag: logTag, completion: completion)
     }
     
@@ -92,7 +105,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
         shared.removeLogPrefix(identifier: identifier, completion: completion)
     }
     
-    public static func addLogPostfix(logTag: LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
+    public static func addLogPostfix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.addLogPostfix(logTag: logTag, completion: completion)
     }
     
@@ -102,46 +115,47 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     //MARK: Log public API's
     
-    public static func log(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .none, message: message) }
+    public static func log(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logT(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .trace, message: message) }
+    public static func logT(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logD(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .debug, message: message) }
+    public static func logD(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logN(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .notice, message: message) }
+    public static func logN(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logI(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .info, message: message) }
+    public static func logI(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logW(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .warning, message: message) }
+    public static func logW(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logE(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .error, message: message) }
+    public static func logE(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logC(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .critical, message: message) }
+    public static func logC(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
-    public static func logF(_ message: String) {
-        shared.queue.async { shared.defaultManager.log(type: .fault, message: message) }
+    public static func logF(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line) }
     }
     
 }
 
 @objc public enum LogType: Int, CaseIterable, @unchecked Sendable {
     
+    case undefined  = -1
     case none       = 0
     case notice     = 1
     case info       = 2
@@ -154,7 +168,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     var stringValue: String {
         switch self {
-            case .none:
+            case .undefined, .none:
                 return ""
             case .notice:
                 return "notice"
@@ -181,29 +195,24 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     var logLevel: LogLevel {
         switch self {
-            case .none:
-                return .default
-            case .notice:
+            case .undefined:
+                return .undefined
+            case .none, .notice:
                 return .default
             case .info:
                 return .info
-            case .debug:
+            case .debug, .trace:
                 return .debug
-            case .trace:
-                return .debug
-            case .warning:
+            case .warning, .error:
                 return .error
-            case .error:
-                return .error
-            case .fault:
-                return .fault
-            case .critical:
+            case .fault, .critical:
                 return .fault
         }
     }
 }
 
 @objc public enum LogLevel: Int, CaseIterable, @unchecked Sendable {
+    case undefined  = -1
     case `default`  = 0
     case info       = 1
     case debug      = 2
