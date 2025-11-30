@@ -16,6 +16,11 @@ import Foundation
     func visit(logTagVisitor: any LogTagVisitor)
 }
 
+@objcMembers
+final class LogTagIdentifiers: NSObject, @unchecked Sendable {
+    static let date = "Date"
+}
+
 @objc public enum SystemTagType: Int {
     
     case file

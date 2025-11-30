@@ -22,7 +22,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
         //Add date tag for all logs
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-mm-dd HH:mm:ss.SSS"
-        addLogPrefix(logTag: LogInternalTag(identifier: "Date", valueProvider: {
+        addLogPrefix(logTag: LogInternalTag(identifier: LogTagIdentifiers.date, valueProvider: {
             dateFormatter.string(from: Date())
         }), completion: nil)
         

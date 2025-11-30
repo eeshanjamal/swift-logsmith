@@ -13,40 +13,46 @@ import OSLog
 final class OSLogger: NSObject, ILogger {
     
     private let logger: Logger
+    let formatter: any LogFormatter
+    let logTagger: LogTagger?
     
-    override init() {
-        logger = Logger()
-        super.init()
+    init(formatter: any LogFormatter = DefaultLogFormatter(), logTagger: LogTagger? = nil) {
+        self.logger = Logger()
+        self.formatter = formatter
+        self.logTagger = logTagger
     }
     
-    public init(subsystem: String, category: String) {
-        logger = Logger(subsystem: subsystem, category: category)
-        super.init()
+    init(subsystem: String, category: String, formatter: any LogFormatter = DefaultLogFormatter(), logTagger: LogTagger? = nil) {
+        self.logger = Logger(subsystem: subsystem, category: category)
+        self.formatter = formatter
+        self.logTagger = logTagger
     }
     
     func log(message: LogMessage) {
+        let formattedMessage = formatter.format(message: message)
         switch message.logType {
         case .undefined: break //Nothing need to be done here
         case .none:
-            logger.log("\(message.completeMessage)")
+            logger.log("\(formattedMessage)")
         case .notice:
-            logger.notice("\(message.completeMessage)")
+            logger.notice("\(formattedMessage)")
         case .info:
-            logger.info("\(message.completeMessage)")
+            logger.info("\(formattedMessage)")
         case .debug:
-            logger.debug("\(message.completeMessage)")
+            logger.debug("\(formattedMessage)")
         case .trace:
-            logger.trace("\(message.completeMessage)")
+            logger.trace("\(formattedMessage)")
         case .warning:
-            logger.warning("\(message.completeMessage)")
+            logger.warning("\(formattedMessage)")
         case .error:
-            logger.error("\(message.completeMessage)")
+            logger.error("\(formattedMessage)")
         case .fault:
-            logger.fault("\(message.completeMessage)")
+            logger.fault("\(formattedMessage)")
         case .critical:
-            logger.critical("\(message.completeMessage)")
+            logger.critical("\(formattedMessage)")
         }
     }
     
 }
+
 
