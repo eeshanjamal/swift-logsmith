@@ -21,7 +21,7 @@ final class LogTagIdentifiers: NSObject, @unchecked Sendable {
     static let date = "Date"
 }
 
-@objc public enum SystemTagType: Int {
+@objc public enum ExternalTagType: Int {
     
     case file
     case function
@@ -44,12 +44,12 @@ final class LogTagIdentifiers: NSObject, @unchecked Sendable {
 
 @objc protocol LogTagVisitor: Sendable {
     
-    func visit(logInternalTag: LogInternalTag)
-    func visit(logExternalTag: LogExternalTag)
+    func visit(internalTag: InternalTag)
+    func visit(externalTag: ExternalTag)
 }
 
 @objcMembers
-final class LogInternalTag: NSObject, LogTag, @unchecked Sendable {
+final class InternalTag: NSObject, LogTag, @unchecked Sendable {
     
     let identifier: String
     let logType: LogType
@@ -72,25 +72,25 @@ final class LogInternalTag: NSObject, LogTag, @unchecked Sendable {
     }
     
     func visit(logTagVisitor: any LogTagVisitor) {
-        logTagVisitor.visit(logInternalTag: self)
+        logTagVisitor.visit(internalTag: self)
     }
 }
 
 @objcMembers
-final class LogExternalTag: NSObject, LogTag, @unchecked Sendable {
+final class ExternalTag: NSObject, LogTag, @unchecked Sendable {
     
     let identifier: String
     let logType: LogType
-    let systemTagType: SystemTagType
+    let externalTagType: ExternalTagType
     
-    init(systemTagType: SystemTagType, logType: LogType = .undefined) {
-        self.identifier = systemTagType.stringValue
+    init(externalTagType: ExternalTagType, logType: LogType = .undefined) {
+        self.identifier = externalTagType.stringValue
         self.logType = logType
-        self.systemTagType = systemTagType
+        self.externalTagType = externalTagType
     }
     
     func visit(logTagVisitor: any LogTagVisitor) {
-        logTagVisitor.visit(logExternalTag: self)
+        logTagVisitor.visit(externalTag: self)
     }
 }
 

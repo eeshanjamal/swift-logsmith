@@ -11,6 +11,17 @@ import Foundation
 @testable import SwiftLogSmith
 
 @Test func logSmithLog() async throws {
+    
+    //Date tag
+    let dateFormatter = DateFormatter()
+    dateFormatter.dateFormat = "yyyy-mm-dd HH:mm:ss.SSS"
+    LogSmith.addTag(InternalTag(identifier: LogTagIdentifiers.date, valueProvider: { dateFormatter.string(from: Date()) }))
+    
+    //System tags
+    LogSmith.addTag(ExternalTag(systemTagType: .file))
+    LogSmith.addTag(ExternalTag(systemTagType: .function))
+    LogSmith.addTag(ExternalTag(systemTagType: .line))
+    
     LogSmith.log("Sample Log")
     LogSmith.logC("Sample Log Critical", metadata: ["error": "404", "description": "Page not found"])
     LogSmith.logD("Sample Log Debug")

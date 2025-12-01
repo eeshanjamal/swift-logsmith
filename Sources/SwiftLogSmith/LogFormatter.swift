@@ -9,6 +9,7 @@ import Foundation
 final class DefaultLogFormatter: NSObject, LogFormatter, @unchecked Sendable {
     
     public var parts: [any LogPart]
+    private static let logTypeValues = LogType.allCases.map{$0.stringValue}
 
     public init(parts: [any LogPart]) {
         self.parts = parts
@@ -16,19 +17,15 @@ final class DefaultLogFormatter: NSObject, LogFormatter, @unchecked Sendable {
 
     public convenience override init() {
         self.init(parts: [
-            LogTagPart(sources: [.prefix], filter: {$0.key == LogTagIdentifiers.date}),
+            LogTagPart(filter: { $0.identifier == LogTagIdentifiers.date }),
             SeparatorPart(),
-            LogTagPart(sources: [.prefix], filter: { tag in
-                tag.key == SystemTagType.file.stringValue || tag.key == SystemTagType.function.stringValue || tag.key == SystemTagType.line.stringValue
-            }, prefix: "<", suffix: ">", separator: " | "),
+            LogTagPart(filter: { $0.tagType == .external }, prefix: "<", suffix: ">", separator: " | "),
             SeparatorPart(),
-            LogTagPart(sources: [.prefix], filter: {LogType.allCases.map{$0.stringValue}.contains($0.key)}, prefix: "[", suffix: "]"),
+            LogTagPart(filter: { DefaultLogFormatter.logTypeValues.contains($0.identifier) }, prefix: "[", suffix: "]"),
             SeparatorPart(),
             MessagePart(),
             SeparatorPart(),
-            MetadataPart(),
-            SeparatorPart(),
-            LogTagPart(sources: [.postfix])
+            MetadataPart()
         ])
     }
 
@@ -83,7 +80,6 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
         case prefix, postfix
     }
     
-    private let sources: [TagSource]
     private let filter: (Tag) -> Bool
     private let enclosureStart: String
     private let enclosureEnd: String
@@ -92,7 +88,6 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
     private let suffix: String
 
     convenience init(
-        sources: [TagSource] = [.prefix, .postfix],
         filter: @escaping (Tag) -> Bool = { _ in true },
         prefix: String = "",
         suffix: String = "",
@@ -100,11 +95,10 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
         enclosureEnd: String = "",
         separator: String = " "
     ) {
-        self.init(sources: sources, enclosureStart: enclosureStart, enclosureEnd: enclosureEnd, separator: separator, prefix: prefix, suffix: suffix, filter: filter)
+        self.init(enclosureStart: enclosureStart, enclosureEnd: enclosureEnd, separator: separator, prefix: prefix, suffix: suffix, filter: filter)
     }
     
     init(
-        sources: [TagSource] = [.prefix, .postfix],
         enclosureStart: String,
         enclosureEnd: String,
         separator: String,
@@ -112,7 +106,6 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
         suffix: String,
         filter: @escaping (Tag) -> Bool
     ) {
-        self.sources = sources
         self.filter = filter
         self.enclosureStart = enclosureStart
         self.enclosureEnd = enclosureEnd
@@ -122,15 +115,8 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
     }
 
     func format(message: LogMessage) -> String {
-        var tagsToConsider: [Tag] = []
-        if sources.contains(.prefix) {
-            tagsToConsider.append(contentsOf: message.prefixTags)
-        }
-        if sources.contains(.postfix) {
-            tagsToConsider.append(contentsOf: message.postfixTags)
-        }
         
-        let filteredTags = tagsToConsider.filter(filter)
+        let filteredTags = message.tags.filter(filter)
         
         guard !filteredTags.isEmpty else { return "" }
         

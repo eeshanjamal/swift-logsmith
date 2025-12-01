@@ -10,85 +10,52 @@ import Foundation
 
 @objc internal protocol LogTaggerOperations: Sendable {
 
-    @objc func addLogPrefix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
-    @objc func removeLogPrefix(identifier: String, completion: (@Sendable(Bool) -> Void)?)
-    @objc func addLogPostfix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
-    @objc func removeLogPostfix(identifier: String, completion: (@Sendable(Bool) -> Void)?)
+    @objc func addTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
+    @objc func removeTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
+    @objc func removeTag(identifier: String, completion: (@Sendable(Bool) -> Void)?)
 }
 
 @objcMembers
 final class LogTagger: NSObject, LogTaggerOperations, @unchecked Sendable {
     
-    private let logPrefixes: LogTagCollection
-    private let logPostfixes: LogTagCollection
+    private let logTagCollection: LogTagCollection
     private let queue: DispatchQueue
     
     override init() {
         queue = DispatchQueue(label: "com.swift.logtag.\(NSUUID().uuidString)")
-        logPrefixes = LogTagCollection()
-        logPostfixes = LogTagCollection()
+        logTagCollection = LogTagCollection()
         super.init()
     }
     
-    //MARK: Log Prefix API's
+    //MARK: Log API's
     
-    public func addLogPrefix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func addTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
-            let result = self.logPrefixes.addTag(logTag)
+            let result = self.logTagCollection.addTag(logTag)
             completion?(result)
         }
     }
     
-    public func  removeLogPrefix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func removeTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
-            let result = self.logPrefixes.removeTag(identifier)
+            let result = self.logTagCollection.removeTag(logTag.identifier)
             completion?(result)
         }
     }
     
-    public func logPrefixTags(logType: LogType, completion: @escaping (@Sendable([any LogTag]) -> Void)) {
+    public func  removeTag(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
-            completion(self.prefixTags(logType: logType))
-        }
-    }
-    
-    //MARK: Log Postfix API's
-    
-    public func addLogPostfix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
-        queue.async {
-            let result = self.logPostfixes.addTag(logTag)
+            let result = self.logTagCollection.removeTag(identifier)
             completion?(result)
         }
     }
     
-    public func removeLogPostfix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func logTags(logType: LogType, completion: @escaping (@Sendable([any LogTag]) -> Void)) {
         queue.async {
-            let result = self.logPostfixes.removeTag(identifier)
-            completion?(result)
+            completion(self.logTagCollection.logTags.filter { $0.logType == .undefined || $0.logType == logType })
         }
     }
-    
-    public func logPostfixTags(logType: LogType, completion: @escaping (@Sendable([any LogTag]) -> Void)) {
-        queue.async {
-            completion(self.postfixTags(logType: logType))
-        }
-    }
-    
-    //MARK: Other API's
-    
-    public func logTags(logType: LogType, completion: @escaping (@Sendable([any LogTag], [any LogTag]) -> Void)) {
-        queue.async {
-            completion(self.prefixTags(logType: logType), self.postfixTags(logType: logType))
-        }
-    }
-    
-    private func prefixTags(logType: LogType) -> [any LogTag] {
-        return logPrefixes.logTags.filter { $0.logType == .undefined || $0.logType == logType }
-    }
-    
-    private func postfixTags(logType: LogType) -> [any LogTag] {
-        return logPostfixes.logTags.filter { $0.logType == .undefined || $0.logType == logType }
-    }
+
 }
 
 private final class LogTagCollection: NSObject, @unchecked Sendable {

@@ -18,26 +18,10 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     private override init() {
         super.init()
-        
-        //Add date tag for all logs
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-mm-dd HH:mm:ss.SSS"
-        addLogPrefix(logTag: LogInternalTag(identifier: LogTagIdentifiers.date, valueProvider: {
-            dateFormatter.string(from: Date())
-        }), completion: nil)
-        
-        //Add System tags
-        addLogPrefix(logTag: LogExternalTag(systemTagType: .file), completion: nil)
-        addLogPrefix(logTag: LogExternalTag(systemTagType: .function), completion: nil)
-        addLogPrefix(logTag: LogExternalTag(systemTagType: .line), completion: nil)
-        
-        //Add symbolic prefix for all log types
+        //Log type symbolic tag
         LogType.allCases.forEach { logType in
-            guard !logType.stringValue.isEmpty && !logType.symbolicValue.isEmpty else {
-                return
-            }
-            addLogPrefix(logTag: LogInternalTag(identifier: logType.stringValue, value: logType.symbolicValue,
-                                        logType: logType), completion: nil)
+            guard !logType.stringValue.isEmpty && !logType.symbolicValue.isEmpty else { return }
+            addTag(InternalTag(identifier: logType.stringValue, value: logType.symbolicValue, logType: logType), completion: nil)
         }
     }
     
@@ -79,38 +63,30 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     //MARK: Log Tagger operations internal API's
     
-    internal func addLogPrefix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)?) {
-        queue.async { self.defaultManager.addLogPrefix(logTag: logTag, completion: completion) }
+    internal func addTag(_ logTag: any LogTag, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.addTag(logTag, completion: completion) }
     }
     
-    internal func removeLogPrefix(identifier: String, completion: (@Sendable (Bool) -> Void)?) {
-        queue.async { self.defaultManager.removeLogPrefix(identifier: identifier, completion: completion) }
+    internal func removeTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?) {
+        queue.async { self.defaultManager.removeTag(logTag, completion: completion) }
     }
     
-    internal func addLogPostfix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)?) {
-        queue.async { self.defaultManager.addLogPostfix(logTag: logTag, completion: completion) }
-    }
-    
-    internal func removeLogPostfix(identifier: String, completion: (@Sendable (Bool) -> Void)?) {
-        queue.async { self.defaultManager.removeLogPostfix(identifier: identifier, completion: completion) }
+    internal func removeTag(identifier: String, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.removeTag(identifier: identifier, completion: completion) }
     }
     
     //MARK: Log Tagger operations public API's
     
-    public static func addLogPrefix(logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
-        shared.addLogPrefix(logTag: logTag, completion: completion)
+    public static func addTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+        shared.addTag(logTag, completion: completion)
     }
     
-    public static func removeLogPrefix(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
-        shared.removeLogPrefix(identifier: identifier, completion: completion)
+    public static func removeTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
+        shared.removeTag(logTag, completion: completion)
     }
     
-    public static func addLogPostfix(logTag: any LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.addLogPostfix(logTag: logTag, completion: completion)
-    }
-    
-    public static func removeLogPostfix(identifier: String, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.removeLogPostfix(identifier: identifier, completion: completion)
+    public static func removeTag(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
+        shared.removeTag(identifier: identifier, completion: completion)
     }
     
     //MARK: Log public API's
