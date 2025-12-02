@@ -19,7 +19,7 @@ final class DefaultLogFormatter: NSObject, LogFormatter, @unchecked Sendable {
         self.init(parts: [
             LogTagPart(filter: { $0.identifier == LogTagIdentifiers.date }),
             SeparatorPart(),
-            LogTagPart(filter: { $0.tagType == .external }, prefix: "<", suffix: ">", separator: " | "),
+            LogTagPart(filter: { $0.tagType == .external }, format: {"\($0.identifier): \($0.value)"},separator: ", ", prefix: "[", suffix: "]"),
             SeparatorPart(),
             LogTagPart(filter: { DefaultLogFormatter.logTypeValues.contains($0.identifier) }, prefix: "[", suffix: "]"),
             SeparatorPart(),
@@ -43,17 +43,29 @@ final class DefaultLogFormatter: NSObject, LogFormatter, @unchecked Sendable {
 @objcMembers
 final class MessagePart: NSObject, LogPart, @unchecked Sendable {
     
+    private let format: (String) -> String
+    
+    init(format: @escaping (String) -> String = { message in message }) {
+        self.format = format
+    }
+    
     func format(message: LogMessage) -> String {
-        return message.message
+        return format(message.message)
     }
 }
 
 @objcMembers
 final class MetadataPart: NSObject, LogPart, @unchecked Sendable {
     
+    private let format: ([String: String]) -> String
+    
+    init(format: @escaping ([String : String]) -> String = { metadata in "\(metadata)" }) {
+        self.format = format
+    }
+    
     func format(message: LogMessage) -> String {
         if !message.metadata.isEmpty {
-            return "metadata: \(message.metadata)"
+            return format(message.metadata)
         }
         return ""
     }
@@ -64,7 +76,7 @@ final class SeparatorPart: NSObject, LogPart, @unchecked Sendable {
     
     private let separator: String
 
-    @objc public init(separator: String = " ") {
+    public init(separator: String = " ") {
         self.separator = separator
     }
 
@@ -81,34 +93,19 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
     }
     
     private let filter: (Tag) -> Bool
-    private let enclosureStart: String
-    private let enclosureEnd: String
+    private let format: (Tag) -> String
     private let separator: String
     private let prefix: String
     private let suffix: String
 
-    convenience init(
-        filter: @escaping (Tag) -> Bool = { _ in true },
-        prefix: String = "",
-        suffix: String = "",
-        enclosureStart: String = "",
-        enclosureEnd: String = "",
-        separator: String = " "
-    ) {
-        self.init(enclosureStart: enclosureStart, enclosureEnd: enclosureEnd, separator: separator, prefix: prefix, suffix: suffix, filter: filter)
-    }
-    
-    init(
-        enclosureStart: String,
-        enclosureEnd: String,
-        separator: String,
-        prefix: String,
-        suffix: String,
-        filter: @escaping (Tag) -> Bool
+    init(filter: @escaping (Tag) -> Bool = { _ in true },
+         format: @escaping (Tag) -> String = { tag in tag.value },
+         separator: String = " ",
+         prefix: String = "",
+         suffix: String = ""
     ) {
         self.filter = filter
-        self.enclosureStart = enclosureStart
-        self.enclosureEnd = enclosureEnd
+        self.format = format
         self.separator = separator
         self.prefix = prefix
         self.suffix = suffix
@@ -117,11 +114,9 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
     func format(message: LogMessage) -> String {
         
         let filteredTags = message.tags.filter(filter)
-        
         guard !filteredTags.isEmpty else { return "" }
         
-        let content = filteredTags.map { "\(enclosureStart)\($0.value)\(enclosureEnd)" }.joined(separator: separator)
-        
+        let content = message.tags.filter(filter).map(format).joined(separator: separator)
         return "\(prefix)\(content)\(suffix)"
     }
 }
