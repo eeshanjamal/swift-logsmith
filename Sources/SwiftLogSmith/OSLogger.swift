@@ -13,16 +13,16 @@ import OSLog
 final class OSLogger: NSObject, ILogger {
     
     private let logger: Logger
-    let formatter: any LogFormatter
+    let formatter: LogFormatter
     let logTagger: LogTagger?
     
-    init(formatter: any LogFormatter = DefaultLogFormatter(), logTagger: LogTagger? = nil) {
+    init(formatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
         self.logger = Logger()
         self.formatter = formatter
         self.logTagger = logTagger
     }
     
-    init(subsystem: String, category: String, formatter: any LogFormatter = DefaultLogFormatter(), logTagger: LogTagger? = nil) {
+    init(subsystem: String, category: String, formatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
         self.logger = Logger(subsystem: subsystem, category: category)
         self.formatter = formatter
         self.logTagger = logTagger
