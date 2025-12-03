@@ -4,7 +4,7 @@ import Foundation
 @objcMembers
 final class LogFormatter: NSObject, @unchecked Sendable {
     
-    public var parts: [any LogPart]
+    private let parts: [any LogPart]
     private static let logTypeValues = LogType.allCases.map { $0.stringValue }
     
     public static var `default`: LogFormatter {
@@ -21,12 +21,13 @@ final class LogFormatter: NSObject, @unchecked Sendable {
             .build()
     }
 
-    public init(parts: [any LogPart]) {
+    private init(parts: [any LogPart]) {
         self.parts = parts
     }
 
     public func format(message: LogMessage) -> String {
-        return parts.map { $0.format(message: message) }.joined()
+        let state = FormattingState(tags: message.tags)
+        return parts.map { $0.format(message: message, state: state) }.joined()
     }
     
     // MARK: - Nested Builder Class
@@ -79,13 +80,22 @@ final class LogFormatter: NSObject, @unchecked Sendable {
     }
 }
 
-@objc protocol LogPart: Sendable {
+@objcMembers
+internal final class FormattingState: NSObject, @unchecked Sendable {
+    var unformattedTags: [Tag]
+      
+    init(tags: [Tag]) {
+      self.unformattedTags = tags
+    }
+}
+
+@objc internal protocol LogPart: Sendable {
     
-    func format(message: LogMessage) -> String
+    func format(message: LogMessage, state: FormattingState) -> String
 }
 
 @objcMembers
-final class MessagePart: NSObject, LogPart, @unchecked Sendable {
+private final class MessagePart: NSObject, LogPart, @unchecked Sendable {
     
     private let format: (String) -> String
     
@@ -93,13 +103,13 @@ final class MessagePart: NSObject, LogPart, @unchecked Sendable {
         self.format = format
     }
     
-    func format(message: LogMessage) -> String {
+    func format(message: LogMessage, state: FormattingState) -> String {
         return format(message.message)
     }
 }
 
 @objcMembers
-final class MetadataPart: NSObject, LogPart, @unchecked Sendable {
+private final class MetadataPart: NSObject, LogPart, @unchecked Sendable {
     
     private let format: ([String: String]) -> String
     
@@ -107,7 +117,7 @@ final class MetadataPart: NSObject, LogPart, @unchecked Sendable {
         self.format = format
     }
     
-    func format(message: LogMessage) -> String {
+    func format(message: LogMessage, state: FormattingState) -> String {
         if !message.metadata.isEmpty {
             return format(message.metadata)
         }
@@ -116,7 +126,7 @@ final class MetadataPart: NSObject, LogPart, @unchecked Sendable {
 }
 
 @objcMembers
-final class SeparatorPart: NSObject, LogPart, @unchecked Sendable {
+private final class SeparatorPart: NSObject, LogPart, @unchecked Sendable {
     
     private let separator: String
 
@@ -124,13 +134,13 @@ final class SeparatorPart: NSObject, LogPart, @unchecked Sendable {
         self.separator = separator
     }
 
-    func format(message: LogMessage) -> String {
+    func format(message: LogMessage, state: FormattingState) -> String {
         return separator
     }
 }
 
 @objcMembers
-final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
+private final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
     
     private let filter: (Tag) -> Bool
     private let format: (Tag) -> String
@@ -151,12 +161,16 @@ final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
         self.suffix = suffix
     }
 
-    func format(message: LogMessage) -> String {
+    func format(message: LogMessage, state: FormattingState) -> String {
         
-        let filteredTags = message.tags.filter(filter)
+        let filteredTags = state.unformattedTags.filter(filter)
         guard !filteredTags.isEmpty else { return "" }
         
-        let content = message.tags.filter(filter).map(format).joined(separator: separator)
+        state.unformattedTags.removeAll(where: { originalTag in
+            filteredTags.contains(where: { $0 === originalTag })
+        })
+
+        let content = filteredTags.map(format).joined(separator: separator)
         return "\(prefix)\(content)\(suffix)"
     }
 }
