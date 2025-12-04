@@ -47,12 +47,11 @@ final class LogFormatterTests: XCTestCase {
         // Format: "MESSAGE - <ID:TAG_VALUE>"
         let builderFormatter = LogFormatter.Builder()
             .addMessagePart()
-            .addSeparator(with: " - ")
             .addTagsPart(
-                filter: { $0.identifier == "TestTag" },
+                prefix: " - <", // Prefix now includes the separator and the bracket
                 format: { "\($0.identifier):\($0.value)" },
-                prefix: "<",
-                suffix: ">"
+                suffix: ">",
+                filter: { $0.identifier == "TestTag" }
             )
             .build()
         

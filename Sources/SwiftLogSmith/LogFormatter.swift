@@ -16,15 +16,11 @@ final class LogFormatter: NSObject, @unchecked Sendable {
     
     public static var `default`: LogFormatter {
         return Builder()
-            .addTagsPart(filter: { $0.identifier == LogTagIdentifiers.date })
-            .addSeparator()
-            .addTagsPart(filter: { $0.tagType == .external }, format: {"\($0.identifier): \($0.value)"}, separator: ", ", prefix: "[", suffix: "]")
-            .addSeparator()
-            .addTagsPart(filter: { logTypeValues.contains($0.identifier) }, prefix: "[", suffix: "]")
-            .addSeparator()
+            .addTagsPart(suffix: " ", filter: { $0.identifier == LogTagIdentifiers.date })
+            .addTagsPart(prefix: "[", format: {"\($0.identifier): \($0.value)"}, separator: ", ", suffix: "] ", filter: { $0.tagType == .external })
+            .addTagsPart(prefix: "[", suffix: "] ", filter: { logTypeValues.contains($0.identifier) })
             .addMessagePart()
-            .addSeparator()
-            .addMetadataPart()
+            .addMetadataPart(prefix: " ")
             .build()
     }
 
@@ -34,7 +30,7 @@ final class LogFormatter: NSObject, @unchecked Sendable {
 
     public func format(message: LogMessage) -> String {
         let state = FormattingState(tags: message.tags)
-        return parts.map { $0.format(message: message, state: state) }.joined()
+        return parts.map { $0.format(logMessage: message, formattingState: state) }.joined()
     }
     
     // MARK: - Nested Builder Class
@@ -45,38 +41,21 @@ final class LogFormatter: NSObject, @unchecked Sendable {
         private var parts: [any LogPart] = []
         
         @discardableResult
-        public func addMessagePart(format: @escaping (String) -> String = { $0 }) -> Self {
-            self.parts.append(MessagePart(format: format))
+        public func addMessagePart(prefix: String = "", format: @escaping (String) -> String = { $0 }, suffix: String = "") -> Self {
+            self.parts.append(MessagePart(prefix: prefix, format: format, suffix: suffix))
             return self
         }
         
         @discardableResult
-        public func addMetadataPart(format: @escaping ([String: String]) -> String = { "\($0)" }) -> Self {
-            self.parts.append(MetadataPart(format: format))
+        public func addMetadataPart(prefix: String = "", format: @escaping ([String: String]) -> String = { "\($0)" }, suffix: String = "") -> Self {
+            self.parts.append(MetadataPart(prefix: prefix, format: format, suffix: suffix))
             return self
         }
 
         @discardableResult
-        public func addSeparator(with separator: String = " ") -> Self {
-            self.parts.append(SeparatorPart(separator: separator))
-            return self
-        }
-
-        @discardableResult
-        public func addTagsPart(
-            filter: @escaping (Tag) -> Bool = { _ in true },
-            format: @escaping (Tag) -> String = { $0.value },
-            separator: String = " ",
-            prefix: String = "",
-            suffix: String = ""
-        ) -> Self {
-            let tagPart = LogTagPart(
-                filter: filter,
-                format: format,
-                separator: separator,
-                prefix: prefix,
-                suffix: suffix
-            )
+        public func addTagsPart(prefix: String = "", format: @escaping (Tag) -> String = { $0.value }, separator: String = " ",
+                                suffix: String = "", filter: @escaping (Tag) -> Bool = { _ in true }) -> Self {
+            let tagPart = LogTagPart(prefix: prefix, format: format, separator: separator, suffix: suffix, filter: filter)
             self.parts.append(tagPart)
             return self
         }
@@ -98,86 +77,78 @@ internal final class FormattingState: NSObject, @unchecked Sendable {
 
 @objc internal protocol LogPart: Sendable {
     
-    func format(message: LogMessage, state: FormattingState) -> String
+    func format(logMessage: LogMessage, formattingState: FormattingState) -> String
 }
 
 @objcMembers
-private final class MessagePart: NSObject, LogPart, @unchecked Sendable {
+private class BaseLogPart: NSObject, @unchecked Sendable {
+    
+    let prefix: String
+    let suffix: String
+    
+    init(prefix: String, suffix: String) {
+        self.prefix = prefix
+        self.suffix = suffix
+    }
+}
+
+@objcMembers
+private final class MessagePart: BaseLogPart, LogPart, @unchecked Sendable {
     
     private let format: (String) -> String
     
-    init(format: @escaping (String) -> String = { $0 }) {
+    init(prefix: String = "", format: @escaping (String) -> String = { $0 }, suffix: String = "") {
         self.format = format
+        super.init(prefix: prefix, suffix: suffix)
     }
     
-    func format(message: LogMessage, state: FormattingState) -> String {
-        return format(message.message)
+    func format(logMessage: LogMessage, formattingState: FormattingState) -> String {
+        guard !logMessage.message.isEmpty else { return "" }
+        let content = format(logMessage.message)
+        return "\(prefix)\(content)\(suffix)"
     }
 }
 
 @objcMembers
-private final class MetadataPart: NSObject, LogPart, @unchecked Sendable {
+private final class MetadataPart: BaseLogPart, LogPart, @unchecked Sendable {
     
     private let format: ([String: String]) -> String
     
-    init(format: @escaping ([String : String]) -> String = { "\($0)" }) {
+    init(prefix: String = "", format: @escaping ([String : String]) -> String = { "\($0)" }, suffix: String = "") {
         self.format = format
+        super.init(prefix: prefix, suffix: suffix)
     }
     
-    func format(message: LogMessage, state: FormattingState) -> String {
-        if !message.metadata.isEmpty {
-            return format(message.metadata)
-        }
-        return ""
+    func format(logMessage: LogMessage, formattingState: FormattingState) -> String {
+        guard !logMessage.metadata.isEmpty else { return "" }
+        let content = format(logMessage.metadata)
+        return "\(prefix)\(content)\(suffix)"
     }
 }
 
 @objcMembers
-private final class SeparatorPart: NSObject, LogPart, @unchecked Sendable {
-    
-    private let separator: String
-
-    public init(separator: String = " ") {
-        self.separator = separator
-    }
-
-    func format(message: LogMessage, state: FormattingState) -> String {
-        return separator
-    }
-}
-
-@objcMembers
-private final class LogTagPart: NSObject, LogPart, @unchecked Sendable {
+private final class LogTagPart: BaseLogPart, LogPart, @unchecked Sendable {
     
     private let filter: (Tag) -> Bool
     private let format: (Tag) -> String
     private let separator: String
-    private let prefix: String
-    private let suffix: String
 
-    init(filter: @escaping (Tag) -> Bool = { _ in true },
-         format: @escaping (Tag) -> String = { $0.value },
-         separator: String = " ",
-         prefix: String = "",
-         suffix: String = ""
-    ) {
-        self.filter = filter
+    init(prefix: String = "", format: @escaping (Tag) -> String = { $0.value }, separator: String = " ", suffix: String = "", filter: @escaping (Tag) -> Bool = { _ in true }) {
         self.format = format
+        self.filter = filter
         self.separator = separator
-        self.prefix = prefix
-        self.suffix = suffix
+        super.init(prefix: prefix, suffix: suffix)
     }
 
-    func format(message: LogMessage, state: FormattingState) -> String {
+    func format(logMessage: LogMessage, formattingState: FormattingState) -> String {
+        let tagsToProcess = formattingState.unformattedTags.filter(filter)
+        guard !tagsToProcess.isEmpty else { return "" }
         
-        let filteredTags = state.unformattedTags.filter(filter)
-        guard !filteredTags.isEmpty else { return "" }
-        
-        state.unformattedTags.removeAll(where: { originalTag in
-            filteredTags.contains(where: { $0 === originalTag })
+        formattingState.unformattedTags.removeAll(where: { originalTag in
+            tagsToProcess.contains(where: { $0 === originalTag })
         })
 
-        let content = filteredTags.map(format).joined(separator: separator)
+        let content = tagsToProcess.map(format).joined(separator: separator)
         return "\(prefix)\(content)\(suffix)"
     }
 }
