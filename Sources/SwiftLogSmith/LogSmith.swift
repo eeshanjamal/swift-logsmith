@@ -13,7 +13,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     private static let shared = LogSmith()
     
-    private let defaultManager = LogManager(defaultLogger: OSLogger())
+    private let defaultManager = LogManager(identifier: String(describing: LogSmith.self), defaultLogger: OSLogger())
     private let queue = DispatchQueue(label: "com.swift.logsmith")
     
     private override init() {

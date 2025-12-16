@@ -16,22 +16,32 @@ import Foundation
     @objc func setMinimumLogType(_ logType: LogType)
 }
 
+extension UserDefaults {
+    func contains(key: String) -> Bool {
+        return object(forKey: key) != nil
+    }
+}
+
 @objcMembers
 final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @unchecked Sendable {
     
-    private var loggerItems: Array<LoggerItem>
-    private let logTagger: LogTagger
-    private let queue: DispatchQueue
-    private var minLogLevel: LogLevel
-    private var minLogType: LogType
+    internal enum defaults: String {
+        case minimumLogLevel
+        case minimumLogType
+    }
     
-    public init(defaultLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none) {
-        self.queue = DispatchQueue(label: "com.swift.logman.\(NSUUID().uuidString)")
-        self.loggerItems = [LoggerItem(logger: defaultLogger, minLogLevel: minLogLevel, minLogType: minLogType, isDefault: true)]
-        self.logTagger = LogTagger()
-        self.minLogLevel = .default
-        self.minLogType = .none
+    internal let identifier: String
+    private var loggerItems: [LoggerItem]
+    private let logTagger = LogTagger()
+    private let queue = DispatchQueue(label: "com.swift.logman.\(NSUUID().uuidString)")
+    private var minLogLevel = LogLevel.default
+    private var minLogType = LogType.none
+    
+    public init(identifier: String, defaultLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none) {
+        self.identifier = identifier
+        self.loggerItems = []
         super.init()
+        self.loggerItems.append(LoggerItem(logger: defaultLogger, parent: self, minLogLevel: minLogLevel, minLogType: minLogType, isDefault: true))
     }
     
     //MARK: Logger API's
@@ -43,7 +53,7 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
                 completion?(false)
                 return
             }
-            self.loggerItems.append(LoggerItem(logger: newLogger, minLogLevel: minLogLevel, minLogType: minLogType))
+            self.loggerItems.append(LoggerItem(logger: newLogger, parent: self, minLogLevel: minLogLevel, minLogType: minLogType))
             completion?(true)
         }
     }
@@ -61,7 +71,7 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
         }
     }
     
-    //MARK: Set Log level and Log Type
+    //MARK: Setter/Getter LogLevel and LogType
     
     public func setMinimumLogLevel(_ logLevel: LogLevel) {
         queue.async {
@@ -75,14 +85,34 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
         }
     }
     
+    private func getMinimumLogLevel() -> LogLevel {
+        let minLogLevelKey = "\(identifier).\(defaults.minimumLogLevel.rawValue)"
+        if UserDefaults.standard.contains(key: minLogLevelKey) {
+            return LogLevel.init(rawValue: UserDefaults.standard.integer(forKey: minLogLevelKey))!
+        }
+        else {
+            return minLogLevel
+        }
+    }
+    
+    private func getMinimumLogType() -> LogType {
+        let minLogTypeKey = "\(identifier).\(defaults.minimumLogType.rawValue)"
+        if UserDefaults.standard.contains(key: minLogTypeKey) {
+            return LogType.init(rawValue: UserDefaults.standard.integer(forKey: minLogTypeKey))!
+        }
+        else {
+            return minLogType
+        }
+    }
+    
     //MARK: Log message public API
     
     public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
         queue.async {
-            if logType.logLevel.rawValue >= self.minLogLevel.rawValue && logType.rawValue >= self.minLogType.rawValue {
+            if logType.logLevel.rawValue >= self.getMinimumLogLevel().rawValue && logType.rawValue >= self.getMinimumLogType().rawValue {
                 self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerTags in
                     self.loggerItems.forEach { loggerItem in
-                        if logType.logLevel.rawValue >= loggerItem.minLogLevel.rawValue && logType.rawValue >= loggerItem.minLogType.rawValue {
+                        if logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue {
                             self.extractTags(logTagger: loggerItem.logger.logTagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
                                 loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata))
                             }
@@ -178,15 +208,40 @@ private final class Utils {
 private final class LoggerItem: NSObject, @unchecked Sendable {
     
     let logger: any ILogger
-    let minLogLevel: LogLevel
-    let minLogType: LogType
     let isDefault: Bool
+    private let parent: LogManager
+    private let minLogLevel: LogLevel
+    private let minLogType: LogType
+    private var loggerName: String {
+        String(describing: type(of: logger))
+    }
     
-    init(logger: any ILogger, minLogLevel: LogLevel, minLogType: LogType, isDefault: Bool = false) {
+    init(logger: any ILogger, parent: LogManager, minLogLevel: LogLevel, minLogType: LogType, isDefault: Bool = false) {
         self.logger = logger
+        self.parent = parent
         self.minLogLevel = minLogLevel
         self.minLogType = minLogType
         self.isDefault = isDefault
         super.init()
+    }
+    
+    internal func getMinimumLogLevel() -> LogLevel {
+        let minLogLevelKey = "\(parent.identifier).\(loggerName).\(LogManager.defaults.minimumLogLevel.rawValue)"
+        if UserDefaults.standard.contains(key: minLogLevelKey) {
+            return LogLevel.init(rawValue: UserDefaults.standard.integer(forKey: minLogLevelKey))!
+        }
+        else {
+            return minLogLevel
+        }
+    }
+    
+    internal func getMinimumLogType() -> LogType {
+        let minLogTypeKey = "\(parent.identifier).\(loggerName).\(LogManager.defaults.minimumLogType.rawValue)"
+        if UserDefaults.standard.contains(key: minLogTypeKey) {
+            return LogType.init(rawValue: UserDefaults.standard.integer(forKey: minLogTypeKey))!
+        }
+        else {
+            return minLogType
+        }
     }
 }
