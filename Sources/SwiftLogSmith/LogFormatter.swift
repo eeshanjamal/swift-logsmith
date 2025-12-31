@@ -15,7 +15,7 @@ final class LogFormatter: NSObject, @unchecked Sendable {
     private static let logTypeValues = LogType.allCases.map { $0.stringValue }
     
     public static var `default`: LogFormatter {
-        return Builder()
+            Builder()
             .addTagsPart(suffix: " ", filter: { $0.identifier == LogTagIdentifiers.date })
             .addTagsPart(prefix: "[", format: {"\($0.identifier): \($0.value)"}, separator: ", ", suffix: "] ", filter: { $0.tagType == .external })
             .addTagsPart(prefix: "[", suffix: "] ", filter: { logTypeValues.contains($0.identifier) })

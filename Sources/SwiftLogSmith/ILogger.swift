@@ -10,7 +10,7 @@ import Foundation
 
 @objc protocol ILogger: Sendable {
     
-    var logTagger: LogTagger? { get }
+    var tagger: LogTagger? { get }
     var formatter: LogFormatter { get }
     func log(message: LogMessage)   
 }

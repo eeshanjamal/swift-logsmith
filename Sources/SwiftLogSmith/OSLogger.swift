@@ -14,18 +14,18 @@ final class OSLogger: NSObject, ILogger {
     
     private let logger: Logger
     let formatter: LogFormatter
-    let logTagger: LogTagger?
+    let tagger: LogTagger?
     
-    init(formatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
-        self.logger = Logger()
-        self.formatter = formatter
-        self.logTagger = logTagger
+    init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
+        logger = Logger()
+        formatter = logFormatter
+        tagger = logTagger
     }
     
-    init(subsystem: String, category: String, formatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
-        self.logger = Logger(subsystem: subsystem, category: category)
-        self.formatter = formatter
-        self.logTagger = logTagger
+    init(subsystem: String, category: String, logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
+        logger = Logger(subsystem: subsystem, category: category)
+        formatter = logFormatter
+        tagger = logTagger
     }
     
     func log(message: LogMessage) {

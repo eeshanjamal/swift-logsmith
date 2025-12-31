@@ -113,7 +113,7 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
                 self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerTags in
                     self.loggerItems.forEach { loggerItem in
                         if logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue {
-                            self.extractTags(logTagger: loggerItem.logger.logTagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
+                            self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
                                 loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata))
                             }
                         }

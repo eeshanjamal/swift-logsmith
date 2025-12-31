@@ -11,6 +11,7 @@ import Foundation
 @objcMembers
 final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unchecked Sendable {
     
+    internal static let sessionLaunchTime = Date()
     private static let shared = LogSmith()
     
     private let defaultManager = LogManager(identifier: String(describing: LogSmith.self), defaultLogger: OSLogger())
