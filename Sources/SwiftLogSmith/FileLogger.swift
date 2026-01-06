@@ -7,6 +7,21 @@
 //
 
 import Foundation
+import ZIPFoundation
+
+/// Keys to specify the property to sort log files by.
+@objc public enum LogFileSortKey: Int {
+    case name
+    case createdAt
+    case modifiedAt
+    case size
+}
+
+/// Specifies the direction for sorting.
+@objc public enum SortOrder: Int {
+    case ascending
+    case descending
+}
 
 @objcMembers
 final class FileLogger: NSObject, ILogger {
@@ -15,76 +30,240 @@ final class FileLogger: NSObject, ILogger {
     let formatter: LogFormatter
     let manager: FileLoggerManager
     
-    init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil, fileLoggerManager: FileLoggerManager = FileLoggerManager.default) {
+    init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil, fileLoggerManager: FileLoggerManager = try! FileLoggerManager()) {
         formatter = logFormatter
         tagger = logTagger
         manager = fileLoggerManager
     }
     
     func log(message: LogMessage) {
-        
+        manager.write(log: formatter.format(message: message))
     }
 }
 
 @objcMembers
 final class FileLoggerManager: NSObject, @unchecked Sendable {
     
-    static let defaultDirectory = "LogSmith"
-    static let defaultArchiveFiles: Int = 100
-    static let defaultDirectorySize: UInt64 = 100 * 1024 * 1024 //100 mb
-    static var `default`: FileLoggerManager {
-        FileLoggerManager()
+    public static let defaultDirectoryName = "LogSmith"
+    public static let defaultMaxArchiveFiles: Int = 10
+    public static let defaultMaxDirectorySize: UInt64 = 100 * 1024 * 1024 // 100 MB
+    
+    public static var `default`: FileLoggerManager {
+        try! FileLoggerManager()
     }
     
-    let logDirectory: String
-    let maximumArchiveFiles: Int
-    let maximumDirectorySize: UInt64
-    let rollingFrequency: any RollingFrequency
+    public let logDirectoryURL: URL
+    public let maximumArchiveFiles: Int
+    public let maximumDirectorySize: UInt64
+    public let rollingFrequency: any RollingFrequency
+
+    private var currentLogFile: LogFile?
     
-    init(logDirectory: String = defaultDirectory, maximumArchiveFiles: Int = defaultArchiveFiles,
-         maximumDirectorySize: UInt64 = defaultDirectorySize, rollingFrequency: any RollingFrequency = SessionRollingFrequency()) {
-        self.logDirectory = logDirectory
+    private let queue = DispatchQueue(label: "com.swiftlogsmith.filelogger", qos: .utility)
+    private let fileManager = FileManager.default
+    private let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        return formatter
+    }()
+
+    public init(logDirectoryName: String = defaultDirectoryName, rollingFrequency: any RollingFrequency = SessionRollingFrequency(),
+        maximumArchiveFiles: Int = defaultMaxArchiveFiles, maximumDirectorySize: UInt64 = defaultMaxDirectorySize) throws {
+        
+        self.rollingFrequency = rollingFrequency
         self.maximumArchiveFiles = maximumArchiveFiles
         self.maximumDirectorySize = maximumDirectorySize
-        self.rollingFrequency = rollingFrequency
+
+        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+            throw NSError(domain: "FileLoggerManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot find Application Support directory."])
+        }
+        
+        let appIdentifier = Bundle.main.bundleIdentifier ?? "com.unknown.app"
+        self.logDirectoryURL = appSupportURL.appendingPathComponent(appIdentifier).appendingPathComponent(logDirectoryName)
+
+        super.init()
+        
+        try fileManager.createDirectory(at: logDirectoryURL, withIntermediateDirectories: true, attributes: nil)
+        self.currentLogFile = listLogFiles(filterByExtensions: ["log"], sortBy: .modifiedAt, order: .descending).first
+    }
+
+    public func write(log: String) {
+        queue.async { self._write(log) }
+    }
+    
+    public func listLogFiles(filterByExtensions: [String]? = nil, sortBy: LogFileSortKey? = nil, order: SortOrder = .ascending) -> [LogFile] {
+        
+        // Only fetch properties if we need them for sorting.
+        let keysToFetch: [URLResourceKey]? = (sortBy != nil) ? [.creationDateKey, .contentModificationDateKey, .fileSizeKey] : nil
+        
+        guard var urls = try? fileManager.contentsOfDirectory(at: logDirectoryURL, includingPropertiesForKeys: keysToFetch, options: []) else {
+            return []
+        }
+        
+        // 1. Filtering on the [URL] array
+        if let extensions = filterByExtensions, !extensions.isEmpty {
+            let lowercasedExtensions = extensions.map { $0.lowercased() }
+            urls = urls.filter { lowercasedExtensions.contains($0.pathExtension.lowercased()) }
+        }
+        
+        // 2. Sorting on the [URL] array for performance
+        if let sortBy = sortBy {
+            urls.sort { (lhsURL, rhsURL) in
+                // Use pre-fetched resource values from the URL for sorting performance
+                let lhsValues = try? lhsURL.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey, .fileSizeKey])
+                let rhsValues = try? rhsURL.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey, .fileSizeKey])
+
+                let result: Bool
+                switch sortBy {
+                case .name:
+                    result = lhsURL.lastPathComponent.compare(rhsURL.lastPathComponent) == .orderedAscending
+                case .size:
+                    result = UInt64(lhsValues?.fileSize ?? 0) < UInt64(rhsValues?.fileSize ?? 0)
+                case .createdAt:
+                    result = (lhsValues?.creationDate ?? .distantPast) < (rhsValues?.creationDate ?? .distantPast)
+                case .modifiedAt:
+                    result = (lhsValues?.contentModificationDate ?? .distantPast) < (rhsValues?.contentModificationDate ?? .distantPast)
+                }
+                return order == .ascending ? result : !result
+            }
+            
+            // 3. Clear the cache from the original URL array to save memory
+            for i in 0..<urls.count {
+                urls[i].removeAllCachedResourceValues()
+            }
+        }
+        
+        // 4. Map to LogFile objects
+        return urls.map { LogFile(url: $0) }
+    }
+    
+    public func clearLogs() {
+        queue.async {
+            let logFiles = self.listLogFiles()
+            for file in logFiles {
+                try? self.fileManager.removeItem(at: file.url)
+            }
+            self.currentLogFile = nil
+        }
+    }
+
+    private func _write(_ log: String) {
+        
+        if currentLogFile == nil {
+            createNewLogFile()
+        }
+
+        guard let currentLogFile = self.currentLogFile else { return }
+
+        if rollingFrequency.shouldRoll(logFile: currentLogFile) {
+            rollFile()
+            purgeArchives()
+        }
+        
+        guard let fileToWrite = self.currentLogFile, let data = (log + "\n").data(using: .utf8) else { return }
+
+        do {
+            if fileManager.fileExists(atPath: fileToWrite.path) {
+                let fileHandle = try FileHandle(forWritingTo: fileToWrite.url)
+                try fileHandle.seekToEnd()
+                try fileHandle.write(contentsOf: data)
+                try fileHandle.close()
+            } else {
+                try data.write(to: fileToWrite.url, options: .atomic)
+            }
+        } catch {
+            print("FileLogger failed to write: \(error)")
+        }
+    }
+
+    private func createNewLogFile() {
+        let timestamp = dateFormatter.string(from: Date())
+        let newURL = logDirectoryURL.appendingPathComponent("\(timestamp).log")
+        self.currentLogFile = LogFile(url: newURL)
+    }
+
+    private func rollFile() {
+        guard let fileToRoll = currentLogFile, fileToRoll.isExist else {
+            createNewLogFile()
+            return
+        }
+
+        let archiveURL = fileToRoll.url.appendingPathExtension("zip")
+
+        do {
+            try fileManager.zipItem(at: fileToRoll.url, to: archiveURL, shouldKeepParent: false, compressionMethod: .deflate)
+            try fileManager.removeItem(at: fileToRoll.url)
+        } catch {
+            print("FileLogger failed to roll file: \(error)")
+        }
+
+        createNewLogFile()
+    }
+
+    private func purgeArchives() {
+        var archives = listLogFiles(filterByExtensions: ["zip"], sortBy: .createdAt, order: .ascending)
+
+        var purgedCount = 0
+        while archives.count > maximumArchiveFiles {
+            let fileToDelete = archives.removeFirst()
+            try? fileManager.removeItem(at: fileToDelete.url)
+            purgedCount += 1
+        }
+        
+        var totalSize = archives.reduce(0) { $0 + $1.size }
+        while totalSize > maximumDirectorySize && !archives.isEmpty {
+            let fileToDelete = archives.removeFirst()
+            totalSize -= fileToDelete.size
+            try? fileManager.removeItem(at: fileToDelete.url)
+            purgedCount += 1
+        }
+        
+        if purgedCount > 0 {
+            print("FileLogger purged \(purgedCount) old archive(s).")
+        }
     }
 }
 
 @objcMembers
 final class LogFile: NSObject {
     
-    let url: URL
-    
-    init(url: URL) {
-        self.url = url
-    }
-    
-    var isExist: Bool {
-        FileManager.default.fileExists(atPath: path)
-    }
-    
-    var path: String {
-        url.path
-    }
-    
-    var name: String {
+    public let url: URL
+
+    public var name: String {
         url.lastPathComponent
     }
     
-    func attributes() throws -> [FileAttributeKey: Any] {
-        return try FileManager.default.attributesOfItem(atPath: path)
+    public var path: String {
+        url.path
     }
     
-    var createdAt: Date? {
-        return (try? attributes())?[.creationDate] as? Date
+    /// A real-time check to see if the file exists on disk.
+    public var isExist: Bool {
+        FileManager.default.fileExists(atPath: path)
+    }
+
+    public init(url: URL) {
+        self.url = url
+        super.init()
     }
     
-    var modifiedAt: Date? {
-        return (try? attributes())?[.modificationDate] as? Date
+    /// The creation date of the file.
+    public var createdAt: Date? {
+        return attributes()?[.creationDate] as? Date
     }
     
-    var size: UInt64 {
-        return (try? attributes())?[.size] as? UInt64 ?? 0
+    /// The modification date of the file.
+    public var modifiedAt: Date? {
+        return attributes()?[.modificationDate] as? Date
+    }
+    
+    /// The size of the file in bytes.
+    public var size: UInt64 {
+        return attributes()?[.size] as? UInt64 ?? 0
+    }
+    
+    private func attributes() -> [FileAttributeKey: Any]? {
+        return try? FileManager.default.attributesOfItem(atPath: path)
     }
 }
 
