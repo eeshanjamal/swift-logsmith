@@ -56,8 +56,17 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     }
     
     public static let defaultDirectoryName = "LogSmith"
+    #if os(watchOS)
     public static let defaultMaxArchiveFiles: Int = 10
+    public static let defaultMaxDirectorySize: UInt64 = 10 * 1024 * 1024 // 10 MB
+    #elseif os(tvOS)
+    public static let defaultMaxArchiveFiles: Int = 5
+    public static let defaultMaxDirectorySize: UInt64 = 5 * 1024 * 1024 // 5 MB
+    #else // macOS, iOS, iPadOS, visionOS
+    public static let defaultMaxArchiveFiles: Int = 100
     public static let defaultMaxDirectorySize: UInt64 = 100 * 1024 * 1024 // 100 MB
+    #endif
+    
     
     public static var `default`: FileLoggerManager {
         try! FileLoggerManager()
@@ -74,7 +83,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     private let fileManager = FileManager.default
     private let dateFormatter: DateFormatter = {
         let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd_HH-mm-ss"
+        formatter.dateFormat = "yyyyMMddHHmmssSSS"
         return formatter
     }()
 
@@ -218,7 +227,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
 
     private func createNewLogFile() {
         let timestamp = dateFormatter.string(from: Date())
-        let newURL = logDirectoryURL.appendingPathComponent("\(timestamp).log")
+        let newURL = logDirectoryURL.appendingPathComponent("SLS_\(timestamp).log")
         self.currentLogFile = LogFile(url: newURL)
     }
 
