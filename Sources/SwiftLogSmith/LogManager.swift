@@ -33,7 +33,7 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     internal let identifier: String
     private var loggerItems: [LoggerItem]
     private let logTagger = LogTagger()
-    private let queue = DispatchQueue(label: "com.swift.logman.\(NSUUID().uuidString)")
+    private let queue = DispatchQueue(label: "com.swift.logsmith.logman.\(NSUUID().uuidString)")
     private var minLogLevel = LogLevel.default
     private var minLogType = LogType.none
     
