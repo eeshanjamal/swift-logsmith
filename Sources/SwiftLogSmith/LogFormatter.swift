@@ -17,7 +17,7 @@ final class LogFormatter: NSObject, @unchecked Sendable {
     public static var `default`: LogFormatter {
             Builder()
             .addTagsPart(suffix: " ", filter: { $0.identifier == LogTagIdentifiers.date })
-            .addTagsPart(prefix: "[", format: {"\($0.identifier): \($0.value)"}, separator: ", ", suffix: "] ", filter: { $0.tagType == .external })
+            .addTagsPart(prefix: "[", format: {"\($0.identifier): \($0.value)"}, separator: ", ", suffix: "] ", filter: { $0.tagType == .internal })
             .addTagsPart(prefix: "[", suffix: "] ", filter: { logTypeValues.contains($0.identifier) })
             .addMessagePart()
             .addMetadataPart(prefix: " ")

@@ -11,13 +11,13 @@ import Foundation
 @testable import SwiftLogSmith
 
 final class MockLogger: ILogger, @unchecked Sendable {
-    var logTagger: SwiftLogSmith.LogTagger? = nil
+    var tagger: LogTagger? = nil
     var formatter: LogFormatter = LogFormatter.default
     
     var lastLoggedMessage: String?
     var expectation: XCTestExpectation?
     
-    func log(message: SwiftLogSmith.LogMessage) {
+    func log(message: LogMessage) {
         lastLoggedMessage = formatter.format(message: message)
         expectation?.fulfill()
     }
@@ -59,7 +59,7 @@ final class LogFormatterTests: XCTestCase {
         mockLogger.formatter = builderFormatter
 
         // 3. Add a tag.
-        LogSmith.addTag(InternalTag(identifier: "TestTag", value: "BuilderTest"))
+        LogSmith.addTag(ExternalTag(identifier: "TestTag", value: "BuilderTest"))
 
         // 4. Log the message.
         let message = "Builder message"

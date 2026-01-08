@@ -170,13 +170,13 @@ private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
         return tags
     }
     
-    func visit(internalTag: InternalTag) {
-        tags.append(Tag(identifier: internalTag.identifier, value: internalTag.value, tagType: .internal))
+    func visit(externalTag: ExternalTag) {
+        tags.append(Tag(identifier: externalTag.identifier, value: externalTag.value, tagType: .external))
     }
     
-    func visit(externalTag: ExternalTag) {
+    func visit(internalTag: InternalTag) {
         let value: String
-        switch externalTag.externalTagType {
+        switch internalTag.internalTagType {
         case .file:
             value = fileId
         case .function:
@@ -186,7 +186,7 @@ private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
         case .threadName:
             value = Utils.threadName()
         }
-        tags.append(Tag(identifier: externalTag.identifier, value: value, tagType: .external))
+        tags.append(Tag(identifier: internalTag.identifier, value: value, tagType: .internal))
     }
 }
 

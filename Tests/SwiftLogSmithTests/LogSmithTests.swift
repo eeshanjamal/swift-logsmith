@@ -15,12 +15,12 @@ import Foundation
     //Date tag
     let dateFormatter = DateFormatter()
     dateFormatter.dateFormat = "yyyy-mm-dd HH:mm:ss.SSS"
-    LogSmith.addTag(InternalTag(identifier: LogTagIdentifiers.date, valueProvider: { dateFormatter.string(from: Date()) }))
+    LogSmith.addTag(ExternalTag(identifier: LogTagIdentifiers.date, valueProvider: { dateFormatter.string(from: Date()) }))
     
     //System tags
-    LogSmith.addTag(ExternalTag(externalTagType: .file))
-    LogSmith.addTag(ExternalTag(externalTagType: .function))
-    LogSmith.addTag(ExternalTag(externalTagType: .line))
+    LogSmith.addTag(InternalTag(internalTagType: .file))
+    LogSmith.addTag(InternalTag(internalTagType: .function))
+    LogSmith.addTag(InternalTag(internalTagType: .line))
     
     LogSmith.log("Sample Log")
     LogSmith.logC("Sample Log Critical", metadata: ["error": "404", "description": "Page not found"])

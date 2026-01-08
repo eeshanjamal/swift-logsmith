@@ -22,7 +22,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
         //Log type symbolic tag
         LogType.allCases.forEach { logType in
             guard !logType.stringValue.isEmpty && !logType.symbolicValue.isEmpty else { return }
-            addTag(InternalTag(identifier: logType.stringValue, value: logType.symbolicValue, logType: logType), completion: nil)
+            addTag(ExternalTag(identifier: logType.stringValue, value: logType.symbolicValue, logType: logType), completion: nil)
         }
     }
     
