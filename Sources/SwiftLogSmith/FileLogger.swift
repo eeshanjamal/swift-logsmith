@@ -53,27 +53,26 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
         case fileNotFound
         case dataPrepareFailed
         case clearLogsFailed
+        case invalidDirectoryName
+        case directoryNotFound
     }
     
     public static let defaultDirectoryName = "LogSmith"
     #if os(watchOS)
-    public static let defaultMaxArchiveFiles: Int = 10
+    public static let defaultMaxArchiveFiles: UInt = 10
     public static let defaultMaxDirectorySize: UInt64 = 10 * 1024 * 1024 // 10 MB
     #elseif os(tvOS)
-    public static let defaultMaxArchiveFiles: Int = 5
+    public static let defaultMaxArchiveFiles: UInt = 5
     public static let defaultMaxDirectorySize: UInt64 = 5 * 1024 * 1024 // 5 MB
-    #else // macOS, iOS, iPadOS, visionOS
-    public static let defaultMaxArchiveFiles: Int = 100
+    #else // macOS, iOS, iPadOS, visionOS etc.
+    public static let defaultMaxArchiveFiles: UInt = 100
     public static let defaultMaxDirectorySize: UInt64 = 100 * 1024 * 1024 // 100 MB
     #endif
     
-    
-    public static var `default`: FileLoggerManager {
-        try! FileLoggerManager()
-    }
+    public static let `default`: FileLoggerManager = try! FileLoggerManager()
     
     public let logDirectoryURL: URL
-    public let maximumArchiveFiles: Int
+    public let maximumArchiveFiles: UInt
     public let maximumDirectorySize: UInt64
     public let rollingFrequency: any RollingFrequency
 
@@ -88,14 +87,19 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     }()
 
     public init(logDirectoryName: String = defaultDirectoryName, rollingFrequency: any RollingFrequency = SessionRollingFrequency(),
-        maximumArchiveFiles: Int = defaultMaxArchiveFiles, maximumDirectorySize: UInt64 = defaultMaxDirectorySize) throws {
+        maximumArchiveFiles: UInt = defaultMaxArchiveFiles, maximumDirectorySize: UInt64 = defaultMaxDirectorySize) throws {
+        
+        //Validate inputs
+        guard !logDirectoryName.contains("/") else {
+            throw NSError(domain: FileLoggerManager.ErrorDomain, code: ErrorCode.invalidDirectoryName.rawValue, userInfo: [NSLocalizedDescriptionKey: "logDirectoryName cannot contain path separators."])
+        }
         
         self.rollingFrequency = rollingFrequency
         self.maximumArchiveFiles = maximumArchiveFiles
         self.maximumDirectorySize = maximumDirectorySize
 
         guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
-            throw NSError(domain: "FileLoggerManager", code: 1, userInfo: [NSLocalizedDescriptionKey: "Cannot find Application Support directory."])
+            throw NSError(domain: FileLoggerManager.ErrorDomain, code: ErrorCode.directoryNotFound.rawValue, userInfo: [NSLocalizedDescriptionKey: "Cannot find Application Support directory."])
         }
         
         let appIdentifier = Bundle.main.bundleIdentifier ?? "com.unknown.app"
@@ -135,16 +139,11 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
 
                 let result: Bool
                 switch sortBy {
-                case .undefined:
-                    result = false
-                case .name:
-                    result = lhsURL.lastPathComponent.compare(rhsURL.lastPathComponent) == .orderedAscending
-                case .size:
-                    result = UInt64(lhsValues?.fileSize ?? 0) < UInt64(rhsValues?.fileSize ?? 0)
-                case .createdAt:
-                    result = (lhsValues?.creationDate ?? .distantPast) < (rhsValues?.creationDate ?? .distantPast)
-                case .modifiedAt:
-                    result = (lhsValues?.contentModificationDate ?? .distantPast) < (rhsValues?.contentModificationDate ?? .distantPast)
+                case .undefined: result = false
+                case .name: result = lhsURL.lastPathComponent.compare(rhsURL.lastPathComponent) == .orderedAscending
+                case .size: result = UInt64(lhsValues?.fileSize ?? 0) < UInt64(rhsValues?.fileSize ?? 0)
+                case .createdAt: result = (lhsValues?.creationDate ?? .distantPast) < (rhsValues?.creationDate ?? .distantPast)
+                case .modifiedAt: result = (lhsValues?.contentModificationDate ?? .distantPast) < (rhsValues?.contentModificationDate ?? .distantPast)
                 }
                 return order == .ascending ? result : !result
             }
@@ -161,9 +160,8 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     
     public func clearLogs(completion: (@Sendable(NSError?) -> Void)? = nil) {
         queue.async {
-            let logFiles = self.listLogFiles()
             var deletionErrors: [NSError] = []
-            for file in logFiles {
+            for file in self.listLogFiles() {
                 do {
                     try self.fileManager.removeItem(at: file.url)
                 } catch let error as NSError {
@@ -174,17 +172,9 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
             if let completion = completion {
                 if deletionErrors.isEmpty {
                     completion(nil)
-                }
-                else {
-                    let userInfo: [String: Any] = [
-                        NSLocalizedDescriptionKey: "Failed to clear one or more logs.",
-                        FileLoggerManager.FailedDeletionsKey: deletionErrors
-                    ]
-                    completion(NSError(
-                        domain: FileLoggerManager.ErrorDomain,
-                        code: ErrorCode.clearLogsFailed.rawValue,
-                        userInfo: userInfo
-                    ))
+                } else {
+                    let userInfo: [String: Any] = [ NSLocalizedDescriptionKey: "Failed to clear one or more logs.", FileLoggerManager.FailedDeletionsKey: deletionErrors ]
+                    completion(NSError(domain: FileLoggerManager.ErrorDomain, code: ErrorCode.clearLogsFailed.rawValue, userInfo: userInfo))
                 }
             }
         }
@@ -289,17 +279,9 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
                 deletionErrors.append(error)
             }
         }
-        
         if !deletionErrors.isEmpty {
-            let userInfo: [String: Any] = [
-                NSLocalizedDescriptionKey: "Failed to purge one or more log archives.",
-                FileLoggerManager.FailedDeletionsKey: deletionErrors
-            ]
-            throw NSError(
-                domain: FileLoggerManager.ErrorDomain,
-                code: ErrorCode.purgeFailed.rawValue,
-                userInfo: userInfo
-            )
+            let userInfo: [String: Any] = [ NSLocalizedDescriptionKey: "Failed to purge one or more log archives.", FileLoggerManager.FailedDeletionsKey: deletionErrors ]
+            throw NSError(domain: FileLoggerManager.ErrorDomain, code: ErrorCode.purgeFailed.rawValue, userInfo: userInfo)
         }
     }
 }
