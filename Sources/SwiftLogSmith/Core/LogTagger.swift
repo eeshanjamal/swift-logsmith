@@ -18,7 +18,11 @@ import Foundation
 
 @objcMembers
 final class LogTagIdentifiers: NSObject, @unchecked Sendable {
-    static let date = "Date"
+    static let date = "date"
+    static let file = "file"
+    static let function = "function"
+    static let line = "line"
+    static let threadName = "threadName"
 }
 
 @objc public enum InternalTagType: Int {
@@ -31,13 +35,13 @@ final class LogTagIdentifiers: NSObject, @unchecked Sendable {
     var stringValue: String {
         switch self {
         case .file:
-            return "file"
+            return LogTagIdentifiers.file
         case .function:
-            return "function"
+            return LogTagIdentifiers.function
         case .line:
-            return "line"
+            return LogTagIdentifiers.line
         case .threadName:
-            return "threadName"
+            return LogTagIdentifiers.threadName
         }
     }
 }
