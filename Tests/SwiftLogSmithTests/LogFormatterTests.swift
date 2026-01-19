@@ -1,7 +1,7 @@
 //
 //  SwiftLogSmith - Swift Logging Library
 //
-//  SPDX-FileCopyrightText: 2025 Eeshan Jamal
+//  SPDX-FileCopyrightText: 2026 Eeshan Jamal
 //
 //  SPDX-License-Identifier: MIT
 //
@@ -194,7 +194,7 @@ final class LogFormatterTests: XCTestCase {
         
         // Formatter with two tag parts:
         // 1. A specific part for "InternalTag"
-        // 2. A catch-all part for any remaining tags
+        // 2. A specific part for "OtherTag"
         let consumingFormatter = LogFormatter.Builder()
             .addTagsPart(
                 prefix: "[",
@@ -206,8 +206,7 @@ final class LogFormatterTests: XCTestCase {
                 prefix: " ", // Space prefix to separate from first tag part
                 format: { "\($0.identifier):\($0.value)" },
                 separator: ", ",
-                suffix: "",
-                filter: { _ in true } // Catch-all for remaining tags
+                filter: { $0.identifier == "OtherTag" } // Make filter specific
             )
             .addMessagePart(prefix: " ")
             .build()
@@ -225,7 +224,7 @@ final class LogFormatterTests: XCTestCase {
         let loggedOutput = try XCTUnwrap(mockLogger.lastLoggedMessage)
 
         // Construct the exact expected output string
-        let expectedOutput = "[I:Value1] OtherTag:Value2 Message" // Assuming OtherTag is the only one remaining after InternalTag is consumed.
+        let expectedOutput = "[I:Value1] OtherTag:Value2 Message"
 
         XCTAssertEqual(loggedOutput, expectedOutput)
 

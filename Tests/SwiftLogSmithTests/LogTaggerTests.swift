@@ -1,7 +1,7 @@
 //
 //  SwiftLogSmith - Swift Logging Library
 //
-//  SPDX-FileCopyrightText: 2025 Eeshan Jamal
+//  SPDX-FileCopyrightText: 2026 Eeshan Jamal
 //
 //  SPDX-License-Identifier: MIT
 //
