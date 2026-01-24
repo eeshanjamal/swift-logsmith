@@ -86,28 +86,77 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
         return formatter
     }()
 
-    public init(logDirectoryName: String = defaultDirectoryName, rollingFrequency: any RollingFrequency = SessionRollingFrequency(),
-        maximumArchiveFiles: UInt = defaultMaxArchiveFiles, maximumDirectorySize: UInt64 = defaultMaxDirectorySize) throws {
-        
-        //Validate inputs
+    /// Public initializer for library consumers.
+    ///
+    /// - Parameters:
+    ///   - logDirectoryName: The name of the subdirectory within the application's support directory where log files will be stored.
+    ///   - rollingFrequency: The strategy used to determine when to roll the active log file into an archive.
+    ///   - maximumArchiveFiles: The maximum number of archived log files to retain. Older archives will be purged if this limit is exceeded.
+    ///                          Note: Setting this to 0 will result in all archives being purged as they are created.
+    ///   - maximumDirectorySize: The maximum total size (in bytes) that the log directory should occupy on disk. This includes active log files and all archives.
+    ///                           If the total size exceeds this limit, oldest archives will be purged until the limit is met.
+    ///                           **Important Considerations for `maximumDirectorySize`:**
+    ///                           - The actual disk usage includes file system overhead and ZIP compression overhead (e.g., ~170-200 bytes per ZIP file).
+    ///                           - If individual log messages are very large, a single log file (and its subsequent archive) can exceed this limit.
+    ///                           - While the system strives to adhere to `maximumDirectorySize`, it's a soft limit. If the smallest possible set of archives (e.g., just one remaining archive) still exceeds this size, that archive will *not* be arbitrarily deleted to meet the limit. Purging prioritizes retaining more recent logs up to the configured `maximumArchiveFiles`.
+    ///
+    /// - Throws: An `NSError` of domain `FileLoggerManager.ErrorDomain` if the `logDirectoryName` is invalid or the Application Support directory cannot be found.
+    public convenience init(
+        logDirectoryName: String = defaultDirectoryName,
+        rollingFrequency: any RollingFrequency = SessionRollingFrequency(),
+        maximumArchiveFiles: UInt = defaultMaxArchiveFiles,
+        maximumDirectorySize: UInt64 = defaultMaxDirectorySize
+    ) throws {
+        // Validate inputs
         guard !logDirectoryName.contains("/") else {
             throw NSError(domain: FileLoggerManager.ErrorDomain, code: ErrorCode.invalidDirectoryName.rawValue, userInfo: [NSLocalizedDescriptionKey: "logDirectoryName cannot contain path separators."])
         }
         
-        self.rollingFrequency = rollingFrequency
-        self.maximumArchiveFiles = maximumArchiveFiles
-        self.maximumDirectorySize = maximumDirectorySize
-
-        guard let appSupportURL = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
+        guard let appSupportURL = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first else {
             throw NSError(domain: FileLoggerManager.ErrorDomain, code: ErrorCode.directoryNotFound.rawValue, userInfo: [NSLocalizedDescriptionKey: "Cannot find Application Support directory."])
         }
         
         let appIdentifier = Bundle.main.bundleIdentifier ?? "com.unknown.app"
-        self.logDirectoryURL = appSupportURL.appendingPathComponent(appIdentifier).appendingPathComponent(logDirectoryName)
+        let finalLogDirectoryURL = appSupportURL.appendingPathComponent(appIdentifier).appendingPathComponent(logDirectoryName)
+        
+        // Delegate to the internal, designated initializer
+        try self.init(
+            logDirectoryURL: finalLogDirectoryURL,
+            rollingFrequency: rollingFrequency,
+            maximumArchiveFiles: maximumArchiveFiles,
+            maximumDirectorySize: maximumDirectorySize
+        )
+    }
 
+    /// Internal initializer for testing and shared logic.
+    ///
+    /// - Parameters:
+    ///   - logDirectoryURL: The URL to the directory where log files will be stored.
+    ///   - rollingFrequency: The strategy used to determine when to roll the active log file into an archive.
+    ///   - maximumArchiveFiles: The maximum number of archived log files to retain. Older archives will be purged if this limit is exceeded.
+    ///                          Note: Setting this to 0 will result in all archives being purged as they are created.
+    ///   - maximumDirectorySize: The maximum total size (in bytes) that the log directory should occupy on disk. This includes active log files and all archives.
+    ///                           If the total size exceeds this limit, oldest archives will be purged until the limit is met.
+    ///                           **Important Considerations for `maximumDirectorySize`:**
+    ///                           - The actual disk usage includes file system overhead and ZIP compression overhead (e.g., ~170-200 bytes per ZIP file).
+    ///                           - If individual log messages are very large, a single log file (and its subsequent archive) can exceed this limit.
+    ///                           - While the system strives to adhere to `maximumDirectorySize`, it's a soft limit. If the smallest possible set of archives (e.g., just one remaining archive) still exceeds this size, that archive will *not* be arbitrarily deleted to meet the limit. Purging prioritizes retaining more recent logs up to the configured `maximumArchiveFiles`.
+    ///
+    /// - Throws: An `NSError` if directory creation fails.
+    internal init(
+        logDirectoryURL: URL,
+        rollingFrequency: any RollingFrequency,
+        maximumArchiveFiles: UInt,
+        maximumDirectorySize: UInt64
+    ) throws {
+        self.logDirectoryURL = logDirectoryURL
+        self.rollingFrequency = rollingFrequency
+        self.maximumArchiveFiles = maximumArchiveFiles
+        self.maximumDirectorySize = maximumDirectorySize
+        
         super.init()
         
-        try fileManager.createDirectory(at: logDirectoryURL, withIntermediateDirectories: true, attributes: nil)
+        try fileManager.createDirectory(at: self.logDirectoryURL, withIntermediateDirectories: true, attributes: nil)
         self.currentLogFile = listLogFiles(filterByExtensions: ["log"], sortBy: .modifiedAt, order: .descending).first
     }
 
@@ -207,9 +256,9 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
             } else {
                 try data.write(to: fileToWrite.url, options: .atomic)
             }
-            completion?(nil) // Success
+            completion?(nil)
         } catch let error as NSError {
-            completion?(error) // Failure
+            completion?(error)
         } catch {
             completion?(error as NSError)
         }
