@@ -107,17 +107,36 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     
     //MARK: Log message public API
     
-    public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
+    public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         queue.async {
-            if logType.logLevel.rawValue >= self.getMinimumLogLevel().rawValue && logType.rawValue >= self.getMinimumLogType().rawValue {
-                self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerTags in
-                    self.loggerItems.forEach { loggerItem in
-                        if logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue {
-                            self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
-                                loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata))
-                            }
+            // Check Manager Level
+            guard logType.logLevel.rawValue >= self.getMinimumLogLevel().rawValue && logType.rawValue >= self.getMinimumLogType().rawValue else {
+                completion?(true)
+                return
+            }
+            
+            self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerTags in
+                
+                // Identify which loggers accept this log level
+                let activeItems = self.loggerItems.filter { loggerItem in
+                    logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue
+                }
+                
+                let group = DispatchGroup()
+                let tracker = ResultTracker()
+                
+                activeItems.forEach { loggerItem in
+                    group.enter()
+                    self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
+                        loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata)) { success in
+                            tracker.record(success)
+                            group.leave()
                         }
                     }
+                }
+                
+                group.notify(queue: self.queue) {
+                    completion?(tracker.allSuccess)
                 }
             }
         }
@@ -150,6 +169,23 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
         queue.async { self.logTagger.removeTag(identifier: identifier, completion: completion) }
     }
 
+}
+
+private final class ResultTracker: @unchecked Sendable {
+    private var _allSuccess = true
+    private let lock = NSLock()
+    
+    var allSuccess: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _allSuccess
+    }
+    
+    func record(_ success: Bool) {
+        lock.lock()
+        defer { lock.unlock() }
+        if !success { _allSuccess = false }
+    }
 }
 
 private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {

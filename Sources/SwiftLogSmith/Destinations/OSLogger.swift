@@ -28,10 +28,12 @@ final class OSLogger: NSObject, ILogger {
         tagger = logTagger
     }
     
-    func log(message: LogMessage) {
+    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)? = nil) {
         let formattedMessage = formatter.format(message: message)
+        var didLog = true
         switch message.logType {
-        case .undefined: break //Nothing need to be done here
+        case .undefined: 
+            didLog = false
         case .none:
             logger.log("\(formattedMessage)")
         case .notice:
@@ -51,6 +53,7 @@ final class OSLogger: NSObject, ILogger {
         case .critical:
             logger.critical("\(formattedMessage)")
         }
+        completion?(didLog)
     }
     
 }

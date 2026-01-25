@@ -37,8 +37,10 @@ final class FileLogger: NSObject, ILogger {
         manager = fileLoggerManager
     }
     
-    func log(message: LogMessage) {
-        manager.write(log: formatter.format(message: message))
+    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)? = nil) {
+        manager.write(log: formatter.format(message: message)) { error in
+            completion?(error == nil)
+        }
     }
 }
 

@@ -12,5 +12,5 @@ import Foundation
     
     var tagger: LogTagger? { get }
     var formatter: LogFormatter { get }
-    func log(message: LogMessage)   
+    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?)
 }
