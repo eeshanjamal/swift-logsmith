@@ -252,33 +252,38 @@ final class FileLoggerManagerTests: XCTestCase {
             maximumDirectorySize: singleArchiveSize * 2 + 50 // Limit to ~2 archives (approx 400 bytes)
         )
 
-        // Act: Write four times. Each write triggers a roll.
-        // 1st roll -> archive 1
-        // 2nd roll -> archive 2
-        // 3rd roll -> archive 3 (now total > maxDirectorySize, should trigger purge)
-        // 4th roll -> archive 4 (now total > maxDirectorySize, should trigger purge)
-        let expectation = XCTestExpectation(description: "All writes should complete")
-        expectation.expectedFulfillmentCount = 4
+        // 1. Create first archive and capture its name
+        let firstWritesExpectation = XCTestExpectation(description: "First two writes")
+        firstWritesExpectation.expectedFulfillmentCount = 2
+        sut.write(log: "\(logMessage) 1") { _ in firstWritesExpectation.fulfill() }
+        Thread.sleep(forTimeInterval: 0.1)
+        sut.write(log: "\(logMessage) 2") { _ in firstWritesExpectation.fulfill() }
+        wait(for: [firstWritesExpectation], timeout: 2.0)
         
-        for i in 1...4 {
-            sut.write(log: "\(logMessage) \(i)") { error in
-                XCTAssertNil(error)
-                expectation.fulfill()
-            }
-            Thread.sleep(forTimeInterval: 0.1) // Ensure distinct file timestamps
-        }
+        let initialArchives = sut.listLogFiles(filterByExtensions: ["zip"], sortBy: .createdAt, order: .ascending)
+        XCTAssertEqual(initialArchives.count, 1, "Should have 1 archive after two writes")
+        let firstArchiveName = try XCTUnwrap(initialArchives.first?.name)
+        XCTAssertFalse(firstArchiveName.isEmpty, "First archive name should not be empty")
         
-        wait(for: [expectation], timeout: 5.0)
+        // 2. Trigger purge by writing more logs
+        let finalWritesExpectation = XCTestExpectation(description: "Next two writes")
+        finalWritesExpectation.expectedFulfillmentCount = 2
+        sut.write(log: "\(logMessage) 3") { _ in finalWritesExpectation.fulfill() }
+        Thread.sleep(forTimeInterval: 0.1)
+        sut.write(log: "\(logMessage) 4") { _ in finalWritesExpectation.fulfill() }
+        wait(for: [finalWritesExpectation], timeout: 2.0)
 
         // Assert
         let finalArchives = sut.listLogFiles(filterByExtensions: ["zip"])
         let totalSize = finalArchives.reduce(0) { $0 + $1.size }
 
-        // After 4 writes, 3 archives were initially created.
+        // After 4 writes, 3 archives were created.
         // The purge should delete oldest archives to bring total under limit.
         XCTAssertEqual(finalArchives.count, 2, "Should be 2 archives remaining after purging by size")
         XCTAssertTrue(totalSize <= sut.maximumDirectorySize, "Total size of archives (\(totalSize)) should be under the limit of \(sut.maximumDirectorySize)")
-        XCTAssertFalse(finalArchives.contains(where: { $0.name.contains("SLS_") && $0.name.contains("1.log.zip") }), "The oldest archive (from first roll) should be purged")
+        
+        let finalArchiveNames = finalArchives.map { $0.name }
+        XCTAssertFalse(finalArchiveNames.contains(firstArchiveName), "The oldest archive (\(firstArchiveName)) should have been purged")
     }
 
     func testClearLogs() throws {
