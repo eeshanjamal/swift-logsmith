@@ -21,9 +21,10 @@ final class FirstMockLogger: ILogger, @unchecked Sendable {
         self.formatter = formatter
     }
 
-    func log(message: LogMessage) {
+    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
         lastLoggedMessage = message
         logCallCount += 1
+        completion?(true)
         expectation?.fulfill()
     }
     
@@ -46,9 +47,10 @@ final class SecondMockLogger: ILogger, @unchecked Sendable {
         self.formatter = formatter
     }
 
-    func log(message: LogMessage) {
+    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
         lastLoggedMessage = message
         logCallCount += 1
+        completion?(true)
         expectation?.fulfill()
     }
     
@@ -58,7 +60,6 @@ final class SecondMockLogger: ILogger, @unchecked Sendable {
         expectation = nil
     }
 }
-
 
 final class LogManagerTests: XCTestCase {
 

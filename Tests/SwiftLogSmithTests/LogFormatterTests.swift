@@ -17,9 +17,10 @@ final class MockLogger: ILogger, @unchecked Sendable {
     var lastLoggedMessage: String?
     var expectation: XCTestExpectation?
     
-    func log(message: LogMessage) {
+    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
         lastLoggedMessage = formatter.format(message: message)
         expectation?.fulfill()
+        completion?(true)
     }
 }
 
