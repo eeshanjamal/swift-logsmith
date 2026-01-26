@@ -15,11 +15,9 @@ final class MockLogger: ILogger, @unchecked Sendable {
     var formatter: LogFormatter = LogFormatter.default
     
     var lastLoggedMessage: String?
-    var expectation: XCTestExpectation?
     
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
         lastLoggedMessage = formatter.format(message: message)
-        expectation?.fulfill()
         completion?(true)
     }
 }
@@ -41,9 +39,8 @@ final class LogFormatterTests: XCTestCase {
     }
     
     func testDefaultFormat() throws {
-        let expectation = XCTestExpectation(description: "Default formatter output should match expected format")
-        mockLogger.expectation = expectation
-        mockLogger.formatter = LogFormatter.default // Use the default formatter
+        let logger = mockLogger!
+        logger.formatter = LogFormatter.default // Use the default formatter
         
         // 1. Setup deterministic mock data
         let mockDateString = "20251205103000123"
@@ -59,20 +56,22 @@ final class LogFormatterTests: XCTestCase {
         // 3. Log the message and capture the line number for the assertion
         let fileName = #fileID
         let functionName = #function
-        let line = #line + 1 // This must point to the next line
-        LogSmith.logI(message, metadata: metadata)
         
-        wait(for: [expectation], timeout: 2.0)
-
-        // 4. Construct the exact expected output string
-        // The default format is: Date | [file, function, line] | [LogType] | Message | Metadata
-        let expectedSystemTags = "[file: \(fileName), function: \(functionName), line: \(line)]"
-        let expectedOutput = "\(mockDateString) \(expectedSystemTags) [I] \(message) [\"status\": \"ok\"]"
-        
-        let loggedOutput = try XCTUnwrap(mockLogger.lastLoggedMessage)
-
-        // 5. Assert exact string equality
-        XCTAssertEqual(loggedOutput, expectedOutput)
+        expectCompletion(description: "Default formatter output should match expected format") { fulfill in
+            let line = #line + 1
+            LogSmith.logI(message, metadata: metadata) { _ in
+                // 4. Construct the exact expected output string
+                // The default format is: Date | [file, function, line] | [LogType] | Message | Metadata
+                let expectedSystemTags = "[file: \(fileName), function: \(functionName), line: \(line)]"
+                let expectedOutput = "\(mockDateString) \(expectedSystemTags) [I] \(message) [\"status\": \"ok\"]"
+                
+                let loggedOutput = logger.lastLoggedMessage
+                
+                // 5. Assert exact string equality
+                XCTAssertEqual(loggedOutput, expectedOutput)
+                fulfill()
+            }
+        }
         
         // Cleanup
         LogSmith.removeTag(identifier: "Date")
@@ -82,34 +81,33 @@ final class LogFormatterTests: XCTestCase {
     }
     
     func testMessagePartFormat() throws {
-        let expectation = XCTestExpectation(description: "MessagePart should produce empty string for empty message")
-        mockLogger.expectation = expectation
-        
+        let logger = mockLogger!
         let emptyMessageFormatter = LogFormatter.Builder()
             .addMessagePart(prefix: "START[", suffix: "]END")
             .build()
         
-        mockLogger.formatter = emptyMessageFormatter
-        LogSmith.log("") // Log an empty message
+        logger.formatter = emptyMessageFormatter
         
-        wait(for: [expectation], timeout: 2.0)
-        
-        let loggedOutput = try XCTUnwrap(mockLogger.lastLoggedMessage)
-        XCTAssertEqual(loggedOutput, "") // Expect empty output for empty message
+        expectCompletion(description: "MessagePart should produce empty string for empty message") { fulfill in
+            LogSmith.log("") { _ in
+                let loggedOutput = logger.lastLoggedMessage
+                XCTAssertEqual(loggedOutput, "") // Expect empty output for empty message
+                fulfill()
+            }
+        }
         
         // Test with a non-empty message to ensure formatter works correctly
-        let nonEmptyMessageExpectation = XCTestExpectation(description: "MessagePart should work with non-empty message")
-        mockLogger.expectation = nonEmptyMessageExpectation
-        LogSmith.log("Hello")
-        wait(for: [nonEmptyMessageExpectation], timeout: 2.0)
-        let loggedOutputNonEmpty = try XCTUnwrap(mockLogger.lastLoggedMessage)
-        XCTAssertEqual(loggedOutputNonEmpty, "START[Hello]END")
+        expectCompletion(description: "MessagePart should work with non-empty message") { fulfill in
+            LogSmith.log("Hello") { _ in
+                let loggedOutputNonEmpty = logger.lastLoggedMessage
+                XCTAssertEqual(loggedOutputNonEmpty, "START[Hello]END")
+                fulfill()
+            }
+        }
     }
     
     func testMetadataPartFormat() throws {
-        let expectation = XCTestExpectation(description: "MetadataPart should correctly format and include metadata")
-        mockLogger.expectation = expectation
-        
+        let logger = mockLogger!
         let testMetadata: [String: String] = ["user": "testUser", "id": "123"]
         
         // The format closure for metadata part sorts keys. Ensure expected string matches this.
@@ -129,33 +127,34 @@ final class LogFormatterTests: XCTestCase {
             )
             .build()
         
-        mockLogger.formatter = metadataFormatter
+        logger.formatter = metadataFormatter
         
         let message = "Test message with metadata"
-        LogSmith.log(message, metadata: testMetadata)
         
-        wait(for: [expectation], timeout: 2.0)
-        
-        let loggedOutput = try XCTUnwrap(mockLogger.lastLoggedMessage)
-        XCTAssertEqual(loggedOutput, "\(message)\(expectedMetadataString)")
+        expectCompletion(description: "MetadataPart should correctly format and include metadata") { fulfill in
+            LogSmith.log(message, metadata: testMetadata) { _ in
+                let loggedOutput = logger.lastLoggedMessage
+                XCTAssertEqual(loggedOutput, "\(message)\(expectedMetadataString)")
+                fulfill()
+            }
+        }
         
         // Test with empty metadata - should produce no metadata part
-        let emptyMetadataExpectation = XCTestExpectation(description: "MetadataPart should produce empty string for empty metadata")
-        mockLogger.expectation = emptyMetadataExpectation
-        
         // Re-use the same formatter configured for a space prefix.
         // If metadata is empty, the MetadataPart should return "" (including its prefix).
-        mockLogger.formatter = metadataFormatter
-        LogSmith.log("Message without metadata")
-        wait(for: [emptyMetadataExpectation], timeout: 2.0)
-        let loggedOutputEmpty = try XCTUnwrap(mockLogger.lastLoggedMessage)
-        XCTAssertEqual(loggedOutputEmpty, "Message without metadata")
+        logger.formatter = metadataFormatter
+        
+        expectCompletion(description: "MetadataPart should produce empty string for empty metadata") { fulfill in
+            LogSmith.log("Message without metadata") { _ in
+                let loggedOutputEmpty = logger.lastLoggedMessage
+                XCTAssertEqual(loggedOutputEmpty, "Message without metadata")
+                fulfill()
+            }
+        }
     }
     
     func testSingleTagPartFormat() throws {
-        let expectation = XCTestExpectation(description: "Log message should be formatted using the new nested builder")
-        mockLogger.expectation = expectation
-        
+        let logger = mockLogger!
         // 1. Use the nested builder to create a custom format.
         // Format: "MESSAGE - <ID:TAG_VALUE>"
         let builderFormatter = LogFormatter.Builder()
@@ -169,30 +168,29 @@ final class LogFormatterTests: XCTestCase {
             .build()
         
         // 2. Set the new formatter on our mock logger.
-        mockLogger.formatter = builderFormatter
+        logger.formatter = builderFormatter
         
         // 3. Add a tag.
         LogSmith.addTag(ExternalTag(identifier: "TestTag", value: "BuilderTest"))
         
         // 4. Log the message.
         let message = "Builder message"
-        LogSmith.log(message)
         
-        // 5. Wait for the async log to complete and assert the result.
-        wait(for: [expectation], timeout: 2.0)
-        
-        let loggedOutput = try XCTUnwrap(mockLogger.lastLoggedMessage)
-        let expectedOutput = "Builder message - <TestTag:BuilderTest>"
-        XCTAssertEqual(loggedOutput, expectedOutput)
+        expectCompletion(description: "Log message should be formatted using the new nested builder") { fulfill in
+            LogSmith.log(message) { _ in
+                let loggedOutput = logger.lastLoggedMessage
+                let expectedOutput = "Builder message - <TestTag:BuilderTest>"
+                XCTAssertEqual(loggedOutput, expectedOutput)
+                fulfill()
+            }
+        }
         
         // Cleanup
         LogSmith.removeTag(identifier: "TestTag")
     }
     
     func testMultipleTagsPartFormat() throws {
-        let expectation = XCTestExpectation(description: "Tags should be consumed by earlier parts and not duplicated")
-        mockLogger.expectation = expectation
-        
+        let logger = mockLogger!
         // Formatter with two tag parts:
         // 1. A specific part for "InternalTag"
         // 2. A specific part for "OtherTag"
@@ -212,22 +210,21 @@ final class LogFormatterTests: XCTestCase {
             .addMessagePart(prefix: " ")
             .build()
         
-        mockLogger.formatter = consumingFormatter
+        logger.formatter = consumingFormatter
         
         // Add custom key-value tags using the correct ExternalTag class
         LogSmith.addTag(ExternalTag(identifier: "InternalTag", value: "Value1")) // Should be consumed by the first part
         LogSmith.addTag(ExternalTag(identifier: "OtherTag", value: "Value2"))    // Should be consumed by the second part
 
-        LogSmith.log("Message")
-        
-        wait(for: [expectation], timeout: 2.0)
-        
-        let loggedOutput = try XCTUnwrap(mockLogger.lastLoggedMessage)
-
-        // Construct the exact expected output string
-        let expectedOutput = "[I:Value1] OtherTag:Value2 Message"
-
-        XCTAssertEqual(loggedOutput, expectedOutput)
+        expectCompletion(description: "Tags should be consumed by earlier parts and not duplicated") { fulfill in
+            LogSmith.log("Message") { _ in
+                let loggedOutput = logger.lastLoggedMessage
+                // Construct the exact expected output string
+                let expectedOutput = "[I:Value1] OtherTag:Value2 Message"
+                XCTAssertEqual(loggedOutput, expectedOutput)
+                fulfill()
+            }
+        }
 
         // Cleanup
         LogSmith.removeTag(identifier: "InternalTag")
