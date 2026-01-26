@@ -74,17 +74,15 @@ final class FileLoggerManagerTests: XCTestCase {
         let sut = try FileLoggerManager(logDirectoryURL: logDirectory, rollingFrequency: SessionRollingFrequency(), maximumArchiveFiles: 10, maximumDirectorySize: 1024)
         let logMessage = "Hello, world!"
         
-        let writeExpectation = XCTestExpectation(description: "Write operation should complete")
-        
         // Act
-        sut.write(log: logMessage) { error in
-            XCTAssertNil(error)
-            writeExpectation.fulfill()
+        expectCompletion(description: "Write operation should complete", timeout: 2.0) { fulfill in
+            sut.write(log: logMessage) { error in
+                XCTAssertNil(error)
+                fulfill()
+            }
         }
         
         // Assert
-        wait(for: [writeExpectation], timeout: 2.0)
-        
         let logFiles = sut.listLogFiles()
         XCTAssertEqual(logFiles.count, 1, "There should be one log file created")
         
@@ -104,18 +102,18 @@ final class FileLoggerManagerTests: XCTestCase {
         let log1 = "First log, under limit." // ~23 bytes with newline
         let log2 = "Second log, triggers roll." // ~27 bytes with newline
 
-        let expectation1 = XCTestExpectation(description: "First write should complete")
-        sut.write(log: log1) { error in
-            XCTAssertNil(error); expectation1.fulfill()
+        expectCompletion(description: "First write should complete", timeout: 2.0) { fulfill in
+            sut.write(log: log1) { error in
+                XCTAssertNil(error); fulfill()
+            }
         }
-        wait(for: [expectation1], timeout: 2.0)
 
         // Act
-        let expectation2 = XCTestExpectation(description: "Second write should complete and trigger roll")
-        sut.write(log: log2) { error in
-            XCTAssertNil(error); expectation2.fulfill()
+        expectCompletion(description: "Second write should complete and trigger roll", timeout: 2.0) { fulfill in
+            sut.write(log: log2) { error in
+                XCTAssertNil(error); fulfill()
+            }
         }
-        wait(for: [expectation2], timeout: 2.0)
         
         // Assert
         let logFiles = sut.listLogFiles()
@@ -152,21 +150,21 @@ final class FileLoggerManagerTests: XCTestCase {
         let log1 = "First log."
         let log2 = "Second log, after interval."
 
-        let expectation1 = XCTestExpectation(description: "First write should complete")
-        sut.write(log: log1) { error in
-            XCTAssertNil(error); expectation1.fulfill()
+        expectCompletion(description: "First write should complete", timeout: 2.0) { fulfill in
+            sut.write(log: log1) { error in
+                XCTAssertNil(error); fulfill()
+            }
         }
-        wait(for: [expectation1], timeout: 2.0)
         
         // Act
         // Wait for a time longer than the rolling interval to trigger the roll on next write
         Thread.sleep(forTimeInterval: 2.0)
 
-        let expectation2 = XCTestExpectation(description: "Second write should complete and trigger roll")
-        sut.write(log: log2) { error in
-            XCTAssertNil(error); expectation2.fulfill()
+        expectCompletion(description: "Second write should complete and trigger roll", timeout: 2.0) { fulfill in
+            sut.write(log: log2) { error in
+                XCTAssertNil(error); fulfill()
+            }
         }
-        wait(for: [expectation2], timeout: 2.0)
         
         // Assert
         let logFiles = sut.listLogFiles()
@@ -205,12 +203,12 @@ final class FileLoggerManagerTests: XCTestCase {
         )
 
         // 3. Write to an initial log file. This file will be the one that gets rolled.
-        let firstWriteExpectation = XCTestExpectation(description: "Initial write")
-        sut.write(log: "This is the initial log file content.") { error in
-            XCTAssertNil(error)
-            firstWriteExpectation.fulfill()
+        expectCompletion(description: "Initial write", timeout: 2.0) { fulfill in
+            sut.write(log: "This is the initial log file content.") { error in
+                XCTAssertNil(error)
+                fulfill()
+            }
         }
-        wait(for: [firstWriteExpectation], timeout: 2.0)
         
         // Sanity check: we should have 2 archives and 1 log file before the purge-triggering roll
         XCTAssertEqual(sut.listLogFiles(filterByExtensions: ["zip"]).count, 2)
@@ -219,12 +217,12 @@ final class FileLoggerManagerTests: XCTestCase {
         // Act
         // This second write will trigger a roll because the file is no longer empty (size > 1),
         // creating a 3rd archive. The purge logic should then execute.
-        let finalWriteExpectation = XCTestExpectation(description: "Final write that triggers purge")
-        sut.write(log: "This log triggers the purge.") { error in
-            XCTAssertNil(error)
-            finalWriteExpectation.fulfill()
+        expectCompletion(description: "Final write that triggers purge", timeout: 2.0) { fulfill in
+            sut.write(log: "This log triggers the purge.") { error in
+                XCTAssertNil(error)
+                fulfill()
+            }
         }
-        wait(for: [finalWriteExpectation], timeout: 2.0)
 
         // Assert
         let finalArchives = sut.listLogFiles(filterByExtensions: ["zip"])
@@ -253,12 +251,11 @@ final class FileLoggerManagerTests: XCTestCase {
         )
 
         // 1. Create first archive and capture its name
-        let firstWritesExpectation = XCTestExpectation(description: "First two writes")
-        firstWritesExpectation.expectedFulfillmentCount = 2
-        sut.write(log: "\(logMessage) 1") { _ in firstWritesExpectation.fulfill() }
-        Thread.sleep(forTimeInterval: 0.1)
-        sut.write(log: "\(logMessage) 2") { _ in firstWritesExpectation.fulfill() }
-        wait(for: [firstWritesExpectation], timeout: 2.0)
+        expectCompletion(description: "First two writes", fulfillmentCount: 2, timeout: 2.0) { fulfill in
+            sut.write(log: "\(logMessage) 1") { _ in fulfill() }
+            Thread.sleep(forTimeInterval: 0.1)
+            sut.write(log: "\(logMessage) 2") { _ in fulfill() }
+        }
         
         let initialArchives = sut.listLogFiles(filterByExtensions: ["zip"], sortBy: .createdAt, order: .ascending)
         XCTAssertEqual(initialArchives.count, 1, "Should have 1 archive after two writes")
@@ -266,12 +263,11 @@ final class FileLoggerManagerTests: XCTestCase {
         XCTAssertFalse(firstArchiveName.isEmpty, "First archive name should not be empty")
         
         // 2. Trigger purge by writing more logs
-        let finalWritesExpectation = XCTestExpectation(description: "Next two writes")
-        finalWritesExpectation.expectedFulfillmentCount = 2
-        sut.write(log: "\(logMessage) 3") { _ in finalWritesExpectation.fulfill() }
-        Thread.sleep(forTimeInterval: 0.1)
-        sut.write(log: "\(logMessage) 4") { _ in finalWritesExpectation.fulfill() }
-        wait(for: [finalWritesExpectation], timeout: 2.0)
+        expectCompletion(description: "Next two writes", fulfillmentCount: 2, timeout: 2.0) { fulfill in
+            sut.write(log: "\(logMessage) 3") { _ in fulfill() }
+            Thread.sleep(forTimeInterval: 0.1)
+            sut.write(log: "\(logMessage) 4") { _ in fulfill() }
+        }
 
         // Assert
         let finalArchives = sut.listLogFiles(filterByExtensions: ["zip"])
@@ -291,33 +287,27 @@ final class FileLoggerManagerTests: XCTestCase {
         let logDirectory = testDirectoryURL.appendingPathComponent("TestLogs")
         let sut = try FileLoggerManager(logDirectoryURL: logDirectory, rollingFrequency: SessionRollingFrequency(), maximumArchiveFiles: 10, maximumDirectorySize: 1024)
         
-        let writeExpectation = XCTestExpectation(description: "All writes should complete")
-        writeExpectation.expectedFulfillmentCount = 3
-        
         // Act: Create a few log files and archives
-        sut.write(log: "Log 1") { error in XCTAssertNil(error); writeExpectation.fulfill() }
-        Thread.sleep(forTimeInterval: 0.1)
-        sut.write(log: "Log 2") { error in XCTAssertNil(error); writeExpectation.fulfill() }
-        Thread.sleep(forTimeInterval: 0.1) 
-        sut.write(log: "Log 3") { error in XCTAssertNil(error); writeExpectation.fulfill() }
-        
-        wait(for: [writeExpectation], timeout: 5.0)
+        expectCompletion(description: "All writes should complete", fulfillmentCount: 3, timeout: 5.0) { fulfill in
+            sut.write(log: "Log 1") { error in XCTAssertNil(error); fulfill() }
+            Thread.sleep(forTimeInterval: 0.1)
+            sut.write(log: "Log 2") { error in XCTAssertNil(error); fulfill() }
+            Thread.sleep(forTimeInterval: 0.1)
+            sut.write(log: "Log 3") { error in XCTAssertNil(error); fulfill() }
+        }
         
         // Sanity check: ensure files exist before clearing
         XCTAssertTrue(sut.listLogFiles().count > 0, "Should have files before clearing")
         
-        let clearExpectation = XCTestExpectation(description: "Clear logs operation should complete")
-        
         // Act: Clear all logs
-        sut.clearLogs {
-            error in
-            XCTAssertNil(error, "Clear logs should complete without errors")
-            clearExpectation.fulfill()
+        expectCompletion(description: "Clear logs operation should complete", timeout: 2.0) { fulfill in
+            sut.clearLogs { error in
+                XCTAssertNil(error, "Clear logs should complete without errors")
+                fulfill()
+            }
         }
         
         // Assert
-        wait(for: [clearExpectation], timeout: 2.0)
-        
         let remainingFiles = sut.listLogFiles()
         XCTAssertEqual(remainingFiles.count, 0, "All log files and archives should be deleted")
     }

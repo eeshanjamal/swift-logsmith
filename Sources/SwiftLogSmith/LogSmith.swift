@@ -92,40 +92,40 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     //MARK: Log public API's
     
-    public static func log(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func log(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logT(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logT(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logD(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logD(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logN(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logN(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logI(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logI(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logW(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logW(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logE(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logE(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logC(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logC(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
-    public static func logF(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line) }
+    public static func logF(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
     
 }
