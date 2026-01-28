@@ -101,6 +101,80 @@ final class LogManagerTests: XCTestCase {
         }
     }
 
+    func testAddLogger_WithMultipleInstancesOfSameType_ShouldSucceed() {
+        let logger1 = SecondMockLogger()
+        let logger2 = SecondMockLogger()
+        
+        expectCompletion(description: "Add first logger") { fulfill in
+            sut.addLogger(newLogger: logger1) { success in
+                XCTAssertTrue(success)
+                fulfill()
+            }
+        }
+        
+        expectCompletion(description: "Add second logger of same type") { fulfill in
+            sut.addLogger(newLogger: logger2) { success in
+                XCTAssertTrue(success, "Should allow adding a second instance of the same logger type")
+                fulfill()
+            }
+        }
+        
+        expectCompletion(description: "Both loggers should receive log") { fulfill in
+            sut.log(message: "test", logType: .info) { _ in
+                XCTAssertEqual(logger1.logCallCount, 1)
+                XCTAssertEqual(logger2.logCallCount, 1)
+                fulfill()
+            }
+        }
+        
+        // Verify removing one doesn't remove the other
+        expectCompletion(description: "Remove first logger") { fulfill in
+            sut.removeLogger(logger: logger1) { success in
+                XCTAssertTrue(success)
+                fulfill()
+            }
+        }
+        
+        logger1.reset()
+        logger2.reset()
+        
+        expectCompletion(description: "Only second logger should receive log") { fulfill in
+            sut.log(message: "test 2", logType: .info) { _ in
+                XCTAssertEqual(logger1.logCallCount, 0)
+                XCTAssertEqual(logger2.logCallCount, 1)
+                fulfill()
+            }
+        }
+    }
+    
+    func testReplaceDefaultLogger_ShouldReplaceAndUseNewConfig() {
+        let newDefaultLogger = FirstMockLogger()
+        let oldDefaultLogger = mockDefaultLogger
+        
+        expectCompletion(description: "Replace default logger with strict config") { fulfill in
+            // Set new logger to only accept .error level
+            sut.replaceDefaultLogger(with: newDefaultLogger, minLogLevel: .error) { success in
+                XCTAssertTrue(success)
+                fulfill()
+            }
+        }
+        
+        expectCompletion(description: "Info log should be filtered by new config") { fulfill in
+            sut.log(message: "info log", logType: .info) { _ in
+                XCTAssertEqual(newDefaultLogger.logCallCount, 0, "New default logger should filter info log based on new config")
+                XCTAssertEqual(oldDefaultLogger?.logCallCount, 0, "Old default logger should be removed")
+                fulfill()
+            }
+        }
+        
+        expectCompletion(description: "Error log should be accepted") { fulfill in
+            sut.log(message: "error log", logType: .error) { _ in
+                XCTAssertEqual(newDefaultLogger.logCallCount, 1, "New default logger should accept error log")
+                fulfill()
+            }
+        }
+    }
+
     func testLogLevelFiltering_ManagerLevel() {
         sut.setMinimumLogLevel(.error)
         
