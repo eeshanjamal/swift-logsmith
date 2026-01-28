@@ -48,8 +48,8 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     
     public func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
-            let newLoggerType = type(of: newLogger)
-            guard !self.loggerItems.contains(where: { type(of: $0.logger) == newLoggerType}) else {
+            // Check for instance identity to prevent adding the exact same logger object twice
+            guard !self.loggerItems.contains(where: { $0.logger === newLogger }) else {
                 completion?(false)
                 return
             }
@@ -60,8 +60,8 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     
     public func removeLogger(logger: any ILogger, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
-            let loggerType = type(of: logger)
-            if let index = self.loggerItems.firstIndex(where: {type(of: $0.logger) == loggerType}), !self.loggerItems[index].isDefault {
+            // Find index by instance identity, ignoring the default logger
+            if let index = self.loggerItems.firstIndex(where: { $0.logger === logger }), !self.loggerItems[index].isDefault {
                 self.loggerItems.remove(at: index)
                 completion?(true)
             }
