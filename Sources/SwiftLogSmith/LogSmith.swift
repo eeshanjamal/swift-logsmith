@@ -36,6 +36,10 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
         queue.async { self.defaultManager.removeLogger(logger: logger, completion: completion) }
     }
     
+    internal func replaceDefaultLogger(with newLogger: any ILogger, minLogLevel: LogLevel, minLogType: LogType, completion: (@Sendable (Bool) -> Void)?) {
+        queue.async { self.defaultManager.replaceDefaultLogger(with: newLogger, minLogLevel: minLogLevel, minLogType: minLogType, completion: completion) }
+    }
+    
     internal func setMinimumLogLevel(_ logLevel: LogLevel) {
         queue.async { self.defaultManager.setMinimumLogLevel(logLevel)}
     }

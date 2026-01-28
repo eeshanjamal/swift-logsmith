@@ -12,6 +12,7 @@ import Foundation
     
     @objc func addLogger(newLogger: any ILogger, minLogLevel: LogLevel, minLogType: LogType, completion: (@Sendable(Bool) -> Void)?)
     @objc func removeLogger(logger: any ILogger, completion: (@Sendable(Bool) -> Void)?)
+    @objc func replaceDefaultLogger(with newLogger: any ILogger, minLogLevel: LogLevel, minLogType: LogType, completion: (@Sendable(Bool) -> Void)?)
     @objc func setMinimumLogLevel(_ logLevel: LogLevel)
     @objc func setMinimumLogType(_ logType: LogType)
 }
@@ -67,6 +68,20 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
             }
             else {
                 completion?(false)
+            }
+        }
+    }
+    
+    public func replaceDefaultLogger(with newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
+        queue.async {
+            if let index = self.loggerItems.firstIndex(where: { $0.isDefault }) {
+                self.loggerItems.remove(at: index)
+                self.loggerItems.insert(LoggerItem(logger: newLogger, parent: self, minLogLevel: minLogLevel, minLogType: minLogType, isDefault: true), at: index)
+                completion?(true)
+            } else {
+                // Should technically never happen if initialized correctly, but safe to handle
+                self.loggerItems.insert(LoggerItem(logger: newLogger, parent: self, minLogLevel: minLogLevel, minLogType: minLogType, isDefault: true), at: 0)
+                completion?(true)
             }
         }
     }
