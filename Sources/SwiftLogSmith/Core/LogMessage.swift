@@ -8,17 +8,27 @@
 
 import Foundation
 
+/// An enum that distinguishes between different implementations of ``LogTag`` by associating a type to each one.
 @objc public enum TagType: Int {
     
+    /// This type represent ``InternalTag`` implementation.
     case `internal`
+    /// This type represent ``ExternalTag`` implementation.
     case external
 }
 
+/// A concrete, internal-facing data object representing a single tag.
+///
+/// This class holds the final, evaluated value of a ``LogTag`` instance along with its type. It gets created automatically by the system and doesn't require manual creation by the user.
+/// It also gets associated automatically to the ``LogMessage`` instance which later can be used by the ``LogFormatter`` to format and represent.
 @objcMembers
 final class Tag: NSObject, @unchecked Sendable {
     
+    /// The unique identifier for the tag.
     let identifier: String
+    /// The final, string-represented value of the tag.
     let value: String
+    /// The type of the tag, representing a specific implementation of ``LogType``
     let tagType: TagType
     
     internal init(identifier: String, value: String, tagType: TagType) {
@@ -28,12 +38,21 @@ final class Tag: NSObject, @unchecked Sendable {
     }
 }
 
+/// A data object that encapsulates all the raw information for a single log.
+///
+/// A `LogMessage` is created automatically by the system (and doesn't required manual creation by the user) which later passed to concrete implementations of Iogger's ``ILogger/log(message:completion:)`` method.
+///
+/// It serves as a container for a single log raw data (including message, severity, metadata, and all associated tags) before it gets processed by any implementation of ``ILogger``.
 @objcMembers
 final class LogMessage: NSObject, @unchecked Sendable {
     
+    /// The raw (or non-formatted) log message string.
     let message: String
+    /// The severity type of the log.
     let logType: LogType
+    /// An array of tags associated with the log.
     let tags: [Tag]
+    /// A dictionary of additional data associated with the log.
     let metadata: [String: String]
     
     internal init(message: String, logType: LogType, tags: [Tag], metadata: [String: String]) {
