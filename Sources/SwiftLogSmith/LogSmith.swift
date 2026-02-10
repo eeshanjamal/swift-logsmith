@@ -154,9 +154,10 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     
     //MARK: Log Tagger operations public API's
     
-    /// Adds a global tag to be included with every log message.
+    /// Adds a global tag.
     ///
-    /// Tags are useful for adding context like User IDs, Session IDs, or Environment info.
+    /// The added tag will appear for all log messages of ``LogSmith`` If matches ``LogType``.
+    /// They are useful for adding context like User IDs, Session IDs, or Environment info.
     ///
     /// > Note: Tags are unique by their identifier. If a tag with the same identifier already exists, the new tag will not be added.
     ///
@@ -167,7 +168,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
         shared.addTag(logTag, completion: completion)
     }
     
-    /// Removes a specific tag instance from the global configuration.
+    /// Removes a global tag by its instance.
     ///
     /// - Parameters:
     ///   - logTag: The specific tag object to remove.
@@ -176,7 +177,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
         shared.removeTag(logTag, completion: completion)
     }
     
-    /// Removes a tag by its identifier string.
+    /// Removes a global tag by its identifier string.
     ///
     /// - Parameters:
     ///   - identifier: The unique identifier of the tag to remove.
