@@ -12,7 +12,7 @@ import ZIPFoundation
 /// An enum to sort the list of log files.
 ///
 /// It provides various sort keys based on ``LogFile`` properties to sort the list of files.
-@objc public enum LogFileSortKey: Int {
+@objc public enum LogFileSortKey: Int, Sendable {
     /// Sort property is not specified.
     case undefined
     /// Sort by ``LogFile.name`` property.
@@ -26,7 +26,7 @@ import ZIPFoundation
 }
 
 /// An enum to specify the direction of sort for the list of log files.
-@objc public enum SortOrder: Int {
+@objc public enum SortOrder: Int, Sendable {
     /// Sort in ascending order (e.g., A-Z, 0-9, oldest to newest).
     case ascending
     /// Sort in descending order (e.g., Z-A, 9-0, newest to oldest).
@@ -113,7 +113,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     public static let FailedDeletionsKey = "FileLoggerManagerFailedDeletionsKey"
     
     /// An enum with different error codes for `FileLoggerManager` operations failure.
-    @objc public enum ErrorCode: Int {
+    @objc public enum ErrorCode: Int, Sendable {
         /// An error occurred during the purging of old log archives. Check the `FailedDeletionsKey` in `userInfo` for details.
         case purgeFailed
         /// The manager could not find or create a log file to write logs.
@@ -413,7 +413,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
 ///
 /// This class provides a convenient, object-oriented way to access the properties of a log file, such as its URL, name, and file attributes (creation date, size, etc.).
 @objcMembers
-final class LogFile: NSObject {
+final class LogFile: NSObject, Sendable {
     
     /// The full URL of the log file.
     public let url: URL
@@ -463,7 +463,7 @@ final class LogFile: NSObject {
 }
 
 /// A protocol that defines a strategy for determining when to roll the active log file.
-@objc protocol RollingFrequency {
+@objc protocol RollingFrequency: Sendable {
     
     /// Determines if the current log file should be rolled based on the implementing strategy's criteria.
     /// - Parameter logFile: The ``LogFile`` instance representing the current active log file.

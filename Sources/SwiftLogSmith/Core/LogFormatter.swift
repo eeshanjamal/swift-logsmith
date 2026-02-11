@@ -45,7 +45,7 @@ import Foundation
 /// >Note: Even though the `LogMessage` have the date & metadata as well but just because custom formatter doesn't include it. It will not appear in the final log output.
 
 @objcMembers
-final class LogFormatter: NSObject, @unchecked Sendable {
+final class LogFormatter: NSObject, Sendable {
     
     private let parts: [any LogPart]
     private static let logTypeValues = LogType.allCases.map { $0.stringValue }

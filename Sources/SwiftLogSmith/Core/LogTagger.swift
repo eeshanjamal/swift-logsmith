@@ -32,7 +32,7 @@ import Foundation
 ///
 /// This class contains some common log tag identifiers (as static constants) which can be used when creating any ``LogTag`` complaint class instance.
 @objcMembers
-final class LogTagIdentifiers: NSObject, @unchecked Sendable {
+final class LogTagIdentifiers: NSObject, Sendable {
     /// Identifier for a timestamp tag.
     static let date = "date"
     /// Identifier for a source file path tag.
@@ -46,7 +46,7 @@ final class LogTagIdentifiers: NSObject, @unchecked Sendable {
 }
 
 /// This enum represents the different types of implicit tags an ``InternalTag`` instance can generate.
-@objc public enum InternalTagType: Int {
+@objc public enum InternalTagType: Int, Sendable {
     
     /// An internal tag type to represent the relative file source path.
     ///
@@ -150,7 +150,7 @@ final class ExternalTag: NSObject, LogTag, @unchecked Sendable {
 /// This type of log tag can be used by the logging system to capture details about the log source call site info (e.g., file, function or  line) and log execution info (e.g., thread name).
 /// These tags are typically generated automatically by the system by providing the intended `InternalLogType`.
 @objcMembers
-final class InternalTag: NSObject, LogTag, @unchecked Sendable {
+final class InternalTag: NSObject, LogTag {
     
     let identifier: String
     let logType: LogType
@@ -199,7 +199,7 @@ final class InternalTag: NSObject, LogTag, @unchecked Sendable {
 /// It's a ``LogTaggerOperations`` complaint class providing the necessary tag collection operations.
 /// It ensures that all operations on its instance are internally performed on a serial dispatch queue, making it safe to use from multiple threads.
 @objcMembers
-final class LogTagger: NSObject, LogTaggerOperations, @unchecked Sendable {
+final class LogTagger: NSObject, LogTaggerOperations {
     
     private let logTagCollection: LogTagCollection
     private let queue: DispatchQueue

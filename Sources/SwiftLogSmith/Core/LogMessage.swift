@@ -9,7 +9,7 @@
 import Foundation
 
 /// An enum that distinguishes between different implementations of ``LogTag`` by associating a type to each one.
-@objc public enum TagType: Int {
+@objc public enum TagType: Int, Sendable {
     
     /// This type represent ``InternalTag`` implementation.
     case `internal`
@@ -22,7 +22,7 @@ import Foundation
 /// This class holds the final, evaluated value of a ``LogTag`` instance along with its type. It gets created automatically by the system and doesn't require manual creation by the user.
 /// It also gets associated automatically to the ``LogMessage`` instance which later can be used by the ``LogFormatter`` to format and represent.
 @objcMembers
-final class Tag: NSObject, @unchecked Sendable {
+final class Tag: NSObject, Sendable {
     
     /// The unique identifier for the tag.
     let identifier: String
@@ -40,11 +40,11 @@ final class Tag: NSObject, @unchecked Sendable {
 
 /// A data class that encapsulates all the raw information for a single log.
 ///
-/// A `LogMessage` is created automatically by the system (and doesn't required manual creation by the user) which later passed to concrete implementations of Iogger's ``ILogger/log(message:completion:)`` method.
+/// A `LogMessage` is created automatically by the system (and doesn't required manual creation by the user) which later passed to concrete implementations of Iogger's ``ILogger.log(message:completion:)`` method.
 ///
 /// It serves as a container for a single log raw data (including message, severity, metadata, and all associated tags) before it gets processed by any implementation of ``ILogger``.
 @objcMembers
-final class LogMessage: NSObject, @unchecked Sendable {
+final class LogMessage: NSObject, Sendable {
     
     /// The raw (or non-formatted) log message string.
     let message: String

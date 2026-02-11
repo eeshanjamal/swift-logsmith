@@ -43,7 +43,7 @@ import Foundation
 /// // Output: 2023-10-25 14:30:00 +0000 [D] User action
 /// ```
 @objcMembers
-final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unchecked Sendable {
+final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
     
     /// The timestamp when the `LogSmith` session was launched.
     /// This is used by `SessionRollingFrequency` to determine if a log file from a previous session needs to be rolled.
@@ -301,7 +301,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
 /// Represents different type (or severity) for logging.
 ///
 /// Provides a granular way to categorize logs, which can be used for low-level filtering. It also provide visual identification (via string or symbolic value).
-@objc public enum LogType: Int, CaseIterable, @unchecked Sendable {
+@objc public enum LogType: Int, CaseIterable, Sendable {
     
     /// This log type can be used for logs with no specified severity. It's useful for maintaining compatibility with systems where severity isn't provided.
     case undefined  = -1
@@ -396,7 +396,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
 /// Represents different level (or severity) for logging.
 ///
 /// Provides a broader way to categorize logs, which can be used for high-level filtering.
-@objc public enum LogLevel: Int, CaseIterable, @unchecked Sendable {
+@objc public enum LogLevel: Int, CaseIterable, Sendable {
     
     /// This log level can be used for filtering logs with no severity. It's useful when no specific filtering threshold is desired.
     case undefined  = -1

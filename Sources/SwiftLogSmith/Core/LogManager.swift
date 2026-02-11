@@ -341,7 +341,7 @@ private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
 }
 
 /// A private utility class for helper functions.
-private final class Utils {
+private final class Utils: Sendable {
     
     /// Returns the name of the current thread or dispatch queue.
     static func threadName() -> String {
@@ -358,7 +358,7 @@ private final class Utils {
 
 /// A private wrapper that holds an ``ILogger`` instance along with its specific configuration.
 @objcMembers
-private final class LoggerItem: NSObject, @unchecked Sendable {
+private final class LoggerItem: NSObject, Sendable {
     
     /// The underlying logger instance.
     let logger: any ILogger
