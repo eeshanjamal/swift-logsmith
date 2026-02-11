@@ -171,7 +171,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations, @unch
     /// Removes a global tag by its instance.
     ///
     /// - Parameters:
-    ///   - logTag: The specific tag object to remove.
+    ///   - logTag: The specific tag instance to remove.
     ///   - completion: An optional closure executed when the operation completes.
     public static func removeTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)? = nil) {
         shared.removeTag(logTag, completion: completion)

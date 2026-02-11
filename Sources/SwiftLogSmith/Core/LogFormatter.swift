@@ -8,7 +8,7 @@
 
 import Foundation
 
-/// A customizable formatter that transforms a ``LogMessage`` object into a final string representation for output.
+/// A customizable formatter that transforms a ``LogMessage`` instance into a final string representation for output.
 ///
 /// `LogFormatter` uses a modular "builder" pattern, allowing you to construct log output by assembling different parts (e.g., tags, message, metadata) in any order. Each part can be customized with prefixes, suffixes, and its own internal formatting.
 ///
@@ -76,7 +76,7 @@ final class LogFormatter: NSObject, @unchecked Sendable {
     }
 
     /// Formats a ``LogMessage`` into a single string based on the added log parts (e.g., tags, message, metadata).
-    /// - Parameter message: The ``LogMessage`` object containing the raw data.
+    /// - Parameter message: The ``LogMessage`` instance containing the raw data.
     /// - Returns: A formatted string ready for output.
     public func format(message: LogMessage) -> String {
         let state = FormattingState(tags: message.tags)

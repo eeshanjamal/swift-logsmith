@@ -17,7 +17,7 @@ import Foundation
     case external
 }
 
-/// A concrete, internal-facing data object representing a single tag.
+/// A concrete, internal-facing data class representing a single tag.
 ///
 /// This class holds the final, evaluated value of a ``LogTag`` instance along with its type. It gets created automatically by the system and doesn't require manual creation by the user.
 /// It also gets associated automatically to the ``LogMessage`` instance which later can be used by the ``LogFormatter`` to format and represent.
@@ -38,7 +38,7 @@ final class Tag: NSObject, @unchecked Sendable {
     }
 }
 
-/// A data object that encapsulates all the raw information for a single log.
+/// A data class that encapsulates all the raw information for a single log.
 ///
 /// A `LogMessage` is created automatically by the system (and doesn't required manual creation by the user) which later passed to concrete implementations of Iogger's ``ILogger/log(message:completion:)`` method.
 ///

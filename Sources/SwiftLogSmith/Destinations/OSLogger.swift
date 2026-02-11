@@ -65,7 +65,7 @@ final class OSLogger: NSObject, ILogger {
     /// on the underlying `os.Logger` instance (e.g., `logger.notice`, `logger.error`).
     ///
     /// - Parameters:
-    ///   - message: The ``LogMessage`` object to be logged.
+    ///   - message: The ``LogMessage`` instance to be logged.
     ///   - completion: An optional closure called after the message is sent to the system. It returns `true` if the log was processed or `false` if the ``LogType`` was `.undefined`.
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)? = nil) {
         let formattedMessage = formatter.format(message: message)

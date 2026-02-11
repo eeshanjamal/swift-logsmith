@@ -47,14 +47,14 @@ import Foundation
     
     /// A ``LogFormatter`` instance that determines the final structure and content of the log message.
     ///
-    /// The formatter is responsible for converting a ``LogMessage`` object into a string representation suitable for output.
+    /// The formatter is responsible for converting a ``LogMessage`` instance into a string representation suitable for output.
     var formatter: LogFormatter { get }
     
     /// Processes and records a log message.
     ///
     /// This is the core method where a logger implemetation receives message logging  request. Logger can format it using its ``formatter``, and writes it to a specific destination (e.g., console, file, or a remote server).
     /// - Parameters:
-    ///   - message: The ``LogMessage`` object to be logged.
+    ///   - message: The ``LogMessage`` instance to be logged.
     ///   - completion: An optional closure that is called after the log has been processed. It returns `true` if logging was successful.
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?)
 }

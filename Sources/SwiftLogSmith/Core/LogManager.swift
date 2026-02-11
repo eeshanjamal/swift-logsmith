@@ -99,7 +99,7 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     
     public func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
-            // Check for instance identity to prevent adding the exact same logger object twice
+            // Check for instance identity to prevent adding the exact same logger twice
             guard !self.loggerItems.contains(where: { $0.logger === newLogger }) else {
                 completion?(false)
                 return
@@ -257,7 +257,7 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     /// Removes a global tag by its instance from the manager.
     ///
     /// - Parameters:
-    ///   - logTag: The specific tag object to remove.
+    ///   - logTag: The specific tag instance to remove.
     ///   - completion: An optional closure executed when the operation completes.
     public func removeTag(_ logTag: any LogTag, completion: (@Sendable (Bool) -> Void)? = nil) {
         queue.async { self.logTagger.removeTag(logTag, completion: completion) }

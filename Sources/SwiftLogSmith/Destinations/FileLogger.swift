@@ -86,7 +86,7 @@ final class FileLogger: NSObject, ILogger {
     
     /// Formats the ``LogMessage`` and forward it to the ``FileLoggerManager`` for writing into the current log file.
     /// - Parameters:
-    ///   - message: The ``LogMessage`` object to be logged.
+    ///   - message: The ``LogMessage`` instance to be logged.
     ///   - completion: An optional closure called after the write operation completes. It returns `true` if the write was successful.
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)? = nil) {
         manager.write(log: formatter.format(message: message)) { error in
@@ -226,7 +226,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     /// It will automatically handle file rolling and purging as needed before performing the write operation.
     /// - Parameters:
     ///   - log: The formatted log string to write.
-    ///   - completion: An optional closure that is called after the write operation finishes. It receives an `NSError` object if an error occurred.
+    ///   - completion: An optional closure that is called after the write operation finishes. It receives an `NSError` instance if an error occurred.
     public func write(log: String, completion: (@Sendable(NSError?) -> Void)? = nil) {
         queue.async { self._write(log, completion: completion) }
     }
@@ -236,7 +236,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     ///   - filterByExtensions: An optional array of file extensions to filter by (e.g., `["log"]`, `["zip"]`).
     ///   - sortBy: The ``LogFileSortKey`` to use for sorting. Defaults to `.undefined`.
     ///   - order: The ``SortOrder`` to use for sorting (ascending or descending).
-    /// - Returns: An array of ``LogFile`` objects matching the criteria.
+    /// - Returns: An array of ``LogFile`` instances matching the criteria.
     public func listLogFiles(filterByExtensions: [String]? = nil, sortBy: LogFileSortKey = .undefined, order: SortOrder = .ascending) -> [LogFile] {
         
         // Only fetch properties if we need them for sorting.
@@ -281,7 +281,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     }
     
     /// Asynchronously deletes all log files within the log directory of this manager.
-    /// - Parameter completion: An optional closure called after the operation finishes. It receives an `NSError` object if one or more files could not be deleted.
+    /// - Parameter completion: An optional closure called after the operation finishes. It receives an `NSError` instance if one or more files could not be deleted.
     public func clearLogs(completion: (@Sendable(NSError?) -> Void)? = nil) {
         queue.async {
             var deletionErrors: [NSError] = []
@@ -409,7 +409,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     }
 }
 
-/// A data object that represents a single log file on disk.
+/// A data instance that represents a single log file on disk.
 ///
 /// This class provides a convenient, object-oriented way to access the properties of a log file, such as its URL, name, and file attributes (creation date, size, etc.).
 @objcMembers
@@ -466,7 +466,7 @@ final class LogFile: NSObject {
 @objc protocol RollingFrequency {
     
     /// Determines if the current log file should be rolled based on the implementing strategy's criteria.
-    /// - Parameter logFile: The ``LogFile`` object representing the current active log file.
+    /// - Parameter logFile: The ``LogFile`` instance representing the current active log file.
     /// - Returns: `true` if the file should be rolled, `false` otherwise.
     @objc func shouldRoll(logFile: LogFile) -> Bool
 }
