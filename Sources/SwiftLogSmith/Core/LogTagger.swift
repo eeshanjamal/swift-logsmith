@@ -107,7 +107,7 @@ final class LogTagIdentifiers: NSObject, Sendable {
 /// let userTag = ExternalTag(identifier: LogTagIdentifiers.date, valueProvider: { Date().description })
 /// ```
 @objcMembers
-final class ExternalTag: NSObject, LogTag, @unchecked Sendable {
+final class ExternalTag: NSObject, LogTag {
     
     let identifier: String
     let logType: LogType
@@ -116,7 +116,7 @@ final class ExternalTag: NSObject, LogTag, @unchecked Sendable {
         return valueProvider()
     }
     
-    private let valueProvider: () -> String
+    private let valueProvider: @Sendable () -> String
     
     /// Creates an `ExternalTag` instance with a static string value.
     /// - Parameters:
@@ -126,7 +126,7 @@ final class ExternalTag: NSObject, LogTag, @unchecked Sendable {
     init(identifier: String, value: String, logType: LogType = .undefined){
         self.identifier = identifier
         self.logType = logType
-        self.valueProvider = {value}
+        self.valueProvider = { value }
     }
     
     /// Creates an `ExternalTag` instance with a dynamically evaluated value.
@@ -134,7 +134,7 @@ final class ExternalTag: NSObject, LogTag, @unchecked Sendable {
     ///   - identifier: The unique identifier for the tag.
     ///   - valueProvider: A closure that returns the tag's value. This closure is executed each time ``value`` is requested.
     ///   - logType: The ``LogType`` this tag should apply to. Defaults to `.undefined` (which means available to all log types).
-    init(identifier: String, valueProvider: @escaping() -> String, logType: LogType = .undefined){
+    init(identifier: String, valueProvider: @escaping @Sendable () -> String, logType: LogType = .undefined){
         self.identifier = identifier
         self.logType = logType
         self.valueProvider = valueProvider
