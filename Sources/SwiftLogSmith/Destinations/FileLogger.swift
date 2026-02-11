@@ -218,7 +218,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
         super.init()
         
         try fileManager.createDirectory(at: self.logDirectoryURL, withIntermediateDirectories: true, attributes: nil)
-        self.currentLogFile = listLogFiles(filterByExtensions: ["log"], sortBy: .modifiedAt, order: .descending).first
+        self.currentLogFile = _listLogFiles(filterByExtensions: ["log"], sortBy: .modifiedAt, order: .descending).first
     }
 
     /// Asynchronously writes a log string to the current log file.
@@ -231,13 +231,20 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
         queue.async { self._write(log, completion: completion) }
     }
     
-    /// Lists all log files (including active and archived) within the log directory of this manager.
+    /// Asynchronously lists all log files (including active and archived) within the log directory of this manager.
     /// - Parameters:
     ///   - filterByExtensions: An optional array of file extensions to filter by (e.g., `["log"]`, `["zip"]`).
     ///   - sortBy: The ``LogFileSortKey`` to use for sorting. Defaults to `.undefined`.
     ///   - order: The ``SortOrder`` to use for sorting (ascending or descending).
-    /// - Returns: An array of ``LogFile`` instances matching the criteria.
-    public func listLogFiles(filterByExtensions: [String]? = nil, sortBy: LogFileSortKey = .undefined, order: SortOrder = .ascending) -> [LogFile] {
+    ///   - completion: A closure called with the list of ``LogFile`` instances matching the criteria.
+    public func listLogFiles(filterByExtensions: [String]? = nil, sortBy: LogFileSortKey = .undefined, order: SortOrder = .ascending, completion: @escaping (@Sendable ([LogFile]) -> Void)) {
+        queue.async {
+            let files = self._listLogFiles(filterByExtensions: filterByExtensions, sortBy: sortBy, order: order)
+            completion(files)
+        }
+    }
+    
+    private func _listLogFiles(filterByExtensions: [String]? = nil, sortBy: LogFileSortKey = .undefined, order: SortOrder = .ascending) -> [LogFile] {
         
         // Only fetch properties if we need them for sorting.
         let keysToFetch: [URLResourceKey]? = (sortBy == .undefined) ? nil : [.creationDateKey, .contentModificationDateKey, .fileSizeKey]
@@ -285,7 +292,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     public func clearLogs(completion: (@Sendable(NSError?) -> Void)? = nil) {
         queue.async {
             var deletionErrors: [NSError] = []
-            for file in self.listLogFiles() {
+            for file in self._listLogFiles() {
                 do {
                     try self.fileManager.removeItem(at: file.url)
                 } catch let error as NSError {
@@ -378,7 +385,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     }
 
     private func purgeArchives() throws {
-        var archives = listLogFiles(filterByExtensions: ["zip"], sortBy: .createdAt, order: .ascending)
+        var archives = _listLogFiles(filterByExtensions: ["zip"], sortBy: .createdAt, order: .ascending)
         var deletionErrors: [NSError] = []
 
         // 1. Purge by count
