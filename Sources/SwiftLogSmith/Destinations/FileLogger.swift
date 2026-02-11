@@ -9,34 +9,85 @@
 import Foundation
 import ZIPFoundation
 
-/// Keys to specify the property to sort log files by.
+/// An enum to sort the list of log files.
+///
+/// It provides various sort keys based on ``LogFile`` properties to sort the list of files.
 @objc public enum LogFileSortKey: Int {
+    /// Sort property is not specified.
     case undefined
+    /// Sort by ``LogFile.name`` property.
     case name
+    /// Sort by ``LogFile.createdAt`` property.
     case createdAt
+    /// Sort by ``LogFile.modifiedAt`` property.
     case modifiedAt
+    /// Sort by ``LogFile.size`` property.
     case size
 }
 
-/// Specifies the direction for sorting.
+/// An enum to specify the direction of sort for the list of log files.
 @objc public enum SortOrder: Int {
+    /// Sort in ascending order (e.g., A-Z, 0-9, oldest to newest).
     case ascending
+    /// Sort in descending order (e.g., Z-A, 9-0, newest to oldest).
     case descending
 }
 
+/// An ``ILogger`` complaint class that logs to a file.
+///
+/// `FileLogger` formats the raw `LogMessage` into a formatted one and forward it to the ``FileLoggerManager`` instance which actually manages the file I/O operations.
+///
+/// **FileLoggerManager Behavior**
+///
+/// It's a comprehensive class to manage all the file logging related operations (such as writing, rolling, archiving and purging).
+/// You can either use the default instance of it or provide a one with custom configurations.
+///
+/// **Usage with Custom Configs**
+///
+/// While you can instantiate `FileLogger` with default configs, There maybe cases where you're required to have custom configuration.
+///
+/// ```swift
+/// do {
+///     // Create a manager with custom rolling and purging rules
+///     let manager = try FileLoggerManager(
+///         rollingFrequency: TimeRollingFrequency(rollingInterval: 3600), // Roll every hour
+///         maximumArchiveFiles: 10
+///     )
+///
+///     // Create the logger with the custom manager
+///     let fileLogger = FileLogger(fileLoggerManager: manager)
+///
+///     // Add it to LogSmith
+///     LogSmith.addLogger(newLogger: fileLogger)
+/// } catch {
+///     print("Failed to set up file logger: \(error)")
+/// }
+/// ```
 @objcMembers
 final class FileLogger: NSObject, ILogger {
     
     let tagger: LogTagger?
     let formatter: LogFormatter
+    
+    /// The ``FileLoggerManager`` instance responsible for all file I/O, rolling, archiving and purging operations.
     let manager: FileLoggerManager
     
+    /// Creates a new `FileLogger` instance.
+    ///
+    /// - Parameters:
+    ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to ``LogFormatter.default``.
+    ///   - logTagger: An optional ``LogTagger`` to automatically add tags to the logs of this specific logger.
+    ///   - fileLoggerManager: The ``FileLoggerManager`` that will handle the underlying file I/O operations. Defaults to a new manager with standard settings.
     init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil, fileLoggerManager: FileLoggerManager = try! FileLoggerManager()) {
         formatter = logFormatter
         tagger = logTagger
         manager = fileLoggerManager
     }
     
+    /// Formats the ``LogMessage`` and forward it to the ``FileLoggerManager`` for writing into the current log file.
+    /// - Parameters:
+    ///   - message: The ``LogMessage`` object to be logged.
+    ///   - completion: An optional closure called after the write operation completes. It returns `true` if the write was successful.
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)? = nil) {
         manager.write(log: formatter.format(message: message)) { error in
             completion?(error == nil)
@@ -44,38 +95,66 @@ final class FileLogger: NSObject, ILogger {
     }
 }
 
+/// A manager to manage the entire lifecycle of log files, including writing, rolling, archiving, and purging.
+///
+/// This class handles all the low-level details of writing logs to disk. Its key responsibilities include:
+/// - **Writing:** Appending log strings to the current active log file.
+/// - **Rolling:** Automatically rolling the current log file with a new one when the rolling frequency condition satisfied (e.g., exceeds a size limit or a time interval).
+/// - **Archiving:** Compressing rolled log files into `.zip` archives to save disk space.
+/// - **Purging:** Deleting the oldest archives to stay within configured storage limits (of maximum directory size & file count).
+///
+/// All file operations are performed asynchronously on a dispatch queue to ensure thread safety.
 @objcMembers
 final class FileLoggerManager: NSObject, @unchecked Sendable {
     
+    /// A domain used by this class when throwing `NSError`.
     public static let ErrorDomain = "com.swift.logsmith.FileLoggerManager.ErrorDomain"
+    /// A key used by this class to store an array of errors inside `NSError`'s `userInfo` dictionary (which may occurred during a composite operation like purging or clearing).
     public static let FailedDeletionsKey = "FileLoggerManagerFailedDeletionsKey"
     
+    /// An enum with different error codes for `FileLoggerManager` operations failure.
     @objc public enum ErrorCode: Int {
+        /// An error occurred during the purging of old log archives. Check the `FailedDeletionsKey` in `userInfo` for details.
         case purgeFailed
+        /// The manager could not find or create a log file to write logs.
         case fileNotFound
+        /// The log string could not be converted to UTF-8 data for writing.
         case dataPrepareFailed
+        /// One or more files could not be deleted during a `clearLogs` operation.
         case clearLogsFailed
+        /// The provided `logDirectoryName` contained invalid characters (e.g., '/').
         case invalidDirectoryName
+        /// The system's Application Support directory could not be located.
         case directoryNotFound
     }
     
+    /// The default name of the directory where logs are stored ("LogSmith").
     public static let defaultDirectoryName = "LogSmith"
+    
     #if os(watchOS)
+    /// The default maximum number of archived log files to keep on watchOS (10).
     public static let defaultMaxArchiveFiles: UInt = 10
+    /// The default maximum size of the log directory on watchOS (10 MB).
     public static let defaultMaxDirectorySize: UInt64 = 10 * 1024 * 1024 // 10 MB
     #elseif os(tvOS)
+    /// The default maximum number of archived log files to keep on tvOS (5).
     public static let defaultMaxArchiveFiles: UInt = 5
+    /// The default maximum size of the log directory on tvOS (5 MB).
     public static let defaultMaxDirectorySize: UInt64 = 5 * 1024 * 1024 // 5 MB
     #else // macOS, iOS, iPadOS, visionOS etc.
+    /// The default maximum number of archived log files to keep on macOS, iOS, iPadOS & visionOS (100).
     public static let defaultMaxArchiveFiles: UInt = 100
+    /// The default maximum size of the log directory on macOS, iOS, iPadOS & visionOS (100 MB).
     public static let defaultMaxDirectorySize: UInt64 = 100 * 1024 * 1024 // 100 MB
     #endif
     
-    public static let `default`: FileLoggerManager = try! FileLoggerManager()
-    
+    /// The URL of the directory where log files and archives are stored.
     public let logDirectoryURL: URL
+    /// The maximum number of archived log files to retain. When this limit is exceeded, the oldest archives are purged.
     public let maximumArchiveFiles: UInt
+    /// The target maximum size (in bytes) for the log directory. When this limit is exceeded, the oldest archives are purged.
     public let maximumDirectorySize: UInt64
+    /// The strategy used to determine when the active log file should be rolled into an archive.
     public let rollingFrequency: any RollingFrequency
 
     private var currentLogFile: LogFile?
@@ -88,21 +167,15 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
         return formatter
     }()
 
-    /// Public initializer for library consumers.
+    /// Creates a new `FileLoggerManager` instance with customizable settings.
     ///
     /// - Parameters:
-    ///   - logDirectoryName: The name of the subdirectory within the application's support directory where log files will be stored.
-    ///   - rollingFrequency: The strategy used to determine when to roll the active log file into an archive.
-    ///   - maximumArchiveFiles: The maximum number of archived log files to retain. Older archives will be purged if this limit is exceeded.
-    ///                          Note: Setting this to 0 will result in all archives being purged as they are created.
-    ///   - maximumDirectorySize: The maximum total size (in bytes) that the log directory should occupy on disk. This includes active log files and all archives.
-    ///                           If the total size exceeds this limit, oldest archives will be purged until the limit is met.
-    ///                           **Important Considerations for `maximumDirectorySize`:**
-    ///                           - The actual disk usage includes file system overhead and ZIP compression overhead (e.g., ~170-200 bytes per ZIP file).
-    ///                           - If individual log messages are very large, a single log file (and its subsequent archive) can exceed this limit.
-    ///                           - While the system strives to adhere to `maximumDirectorySize`, it's a soft limit. If the smallest possible set of archives (e.g., just one remaining archive) still exceeds this size, that archive will *not* be arbitrarily deleted to meet the limit. Purging prioritizes retaining more recent logs up to the configured `maximumArchiveFiles`.
+    ///   - logDirectoryName: The name of the subdirectory within the application's support directory where logs will be stored. Defaults to `LogSmith`. It should be alphanumeric otherwise may result in an error.
+    ///   - rollingFrequency: The strategy for when to roll the active log file. Defaults to `SessionRollingFrequency()`.
+    ///   - maximumArchiveFiles: The maximum number of archived log files to keep. Older archives are purged if this limit is exceeded. Defaults to `defaultMaxArchiveFiles`.
+    ///   - maximumDirectorySize: The target maximum total size (in bytes) of the log directory. Older archives are purged to stay near this limit. Defaults to `defaultMaxDirectorySize`.
     ///
-    /// - Throws: An `NSError` of domain `FileLoggerManager.ErrorDomain` if the `logDirectoryName` is invalid or the Application Support directory cannot be found.
+    /// - Throws: An `NSError` if the `logDirectoryName` is invalid or the log directory cannot be found.
     public convenience init(
         logDirectoryName: String = defaultDirectoryName,
         rollingFrequency: any RollingFrequency = SessionRollingFrequency(),
@@ -131,20 +204,6 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     }
 
     /// Internal initializer for testing and shared logic.
-    ///
-    /// - Parameters:
-    ///   - logDirectoryURL: The URL to the directory where log files will be stored.
-    ///   - rollingFrequency: The strategy used to determine when to roll the active log file into an archive.
-    ///   - maximumArchiveFiles: The maximum number of archived log files to retain. Older archives will be purged if this limit is exceeded.
-    ///                          Note: Setting this to 0 will result in all archives being purged as they are created.
-    ///   - maximumDirectorySize: The maximum total size (in bytes) that the log directory should occupy on disk. This includes active log files and all archives.
-    ///                           If the total size exceeds this limit, oldest archives will be purged until the limit is met.
-    ///                           **Important Considerations for `maximumDirectorySize`:**
-    ///                           - The actual disk usage includes file system overhead and ZIP compression overhead (e.g., ~170-200 bytes per ZIP file).
-    ///                           - If individual log messages are very large, a single log file (and its subsequent archive) can exceed this limit.
-    ///                           - While the system strives to adhere to `maximumDirectorySize`, it's a soft limit. If the smallest possible set of archives (e.g., just one remaining archive) still exceeds this size, that archive will *not* be arbitrarily deleted to meet the limit. Purging prioritizes retaining more recent logs up to the configured `maximumArchiveFiles`.
-    ///
-    /// - Throws: An `NSError` if directory creation fails.
     internal init(
         logDirectoryURL: URL,
         rollingFrequency: any RollingFrequency,
@@ -162,10 +221,22 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
         self.currentLogFile = listLogFiles(filterByExtensions: ["log"], sortBy: .modifiedAt, order: .descending).first
     }
 
+    /// Asynchronously writes a log string to the current log file.
+    ///
+    /// It will automatically handle file rolling and purging as needed before performing the write operation.
+    /// - Parameters:
+    ///   - log: The formatted log string to write.
+    ///   - completion: An optional closure that is called after the write operation finishes. It receives an `NSError` object if an error occurred.
     public func write(log: String, completion: (@Sendable(NSError?) -> Void)? = nil) {
         queue.async { self._write(log, completion: completion) }
     }
     
+    /// Lists all log files (including active and archived) within the log directory of this manager.
+    /// - Parameters:
+    ///   - filterByExtensions: An optional array of file extensions to filter by (e.g., `["log"]`, `["zip"]`).
+    ///   - sortBy: The ``LogFileSortKey`` to use for sorting. Defaults to `.undefined`.
+    ///   - order: The ``SortOrder`` to use for sorting (ascending or descending).
+    /// - Returns: An array of ``LogFile`` objects matching the criteria.
     public func listLogFiles(filterByExtensions: [String]? = nil, sortBy: LogFileSortKey = .undefined, order: SortOrder = .ascending) -> [LogFile] {
         
         // Only fetch properties if we need them for sorting.
@@ -209,6 +280,8 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
         return urls.map { LogFile(url: $0) }
     }
     
+    /// Asynchronously deletes all log files within the log directory of this manager.
+    /// - Parameter completion: An optional closure called after the operation finishes. It receives an `NSError` object if one or more files could not be deleted.
     public func clearLogs(completion: (@Sendable(NSError?) -> Void)? = nil) {
         queue.async {
             var deletionErrors: [NSError] = []
@@ -230,7 +303,6 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
             }
         }
     }
-
     private func _write(_ log: String, completion: ((NSError?) -> Void)? = nil) {
         do {
             if currentLogFile == nil {
@@ -337,40 +409,50 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
     }
 }
 
+/// A data object that represents a single log file on disk.
+///
+/// This class provides a convenient, object-oriented way to access the properties of a log file, such as its URL, name, and file attributes (creation date, size, etc.).
 @objcMembers
 final class LogFile: NSObject {
     
+    /// The full URL of the log file.
     public let url: URL
-
-    public var name: String {
-        url.lastPathComponent
-    }
     
-    public var path: String {
-        url.path
-    }
-    
-    /// A real-time check to see if the file exists on disk.
-    public var isExist: Bool {
-        FileManager.default.fileExists(atPath: path)
-    }
-
+    /// Creates a new `LogFile` instance with provided ``URL``.
+    ///
+    /// - Parameters:
+    ///   - url: The ``URL`` of the file where it's actually stored on disk.
     public init(url: URL) {
         self.url = url
         super.init()
     }
+
+    /// The name of the file, including its extension.
+    public var name: String {
+        url.lastPathComponent
+    }
     
-    /// The creation date of the file.
+    /// The full path of the file as a string.
+    public var path: String {
+        url.path
+    }
+    
+    /// A boolean indicating whether the file currently exists on disk.
+    public var isExist: Bool {
+        FileManager.default.fileExists(atPath: path)
+    }
+    
+    /// The creation date of the file. Returns `nil` if the file attributes cannot be read.
     public var createdAt: Date? {
         return attributes()?[.creationDate] as? Date
     }
     
-    /// The modification date of the file.
+    /// The last modification date of the file. Returns `nil` if the file attributes cannot be read.
     public var modifiedAt: Date? {
         return attributes()?[.modificationDate] as? Date
     }
     
-    /// The size of the file in bytes.
+    /// The size of the file in bytes. Returns `0` if the file attributes cannot be read.
     public var size: UInt64 {
         return attributes()?[.size] as? UInt64 ?? 0
     }
@@ -380,16 +462,23 @@ final class LogFile: NSObject {
     }
 }
 
+/// A protocol that defines a strategy for determining when to roll the active log file.
 @objc protocol RollingFrequency {
     
+    /// Determines if the current log file should be rolled based on the implementing strategy's criteria.
+    /// - Parameter logFile: The ``LogFile`` object representing the current active log file.
+    /// - Returns: `true` if the file should be rolled, `false` otherwise.
     @objc func shouldRoll(logFile: LogFile) -> Bool
 }
 
+/// A ``RollingFrequency`` complaint class that rolls the log file if it's older than a specified time interval.
 @objcMembers
 final class TimeRollingFrequency: NSObject, RollingFrequency {
     
     private let rollingInterval: TimeInterval
     
+    /// Creates a ``TimeRollingFrequency`` instance based on time rolling strategy.
+    /// - Parameter rollingInterval: The maximum age of the log file in seconds. If the file is older than this, it will be rolled.
     init(rollingInterval: TimeInterval) {
         self.rollingInterval = rollingInterval
     }
@@ -406,11 +495,14 @@ final class TimeRollingFrequency: NSObject, RollingFrequency {
     }
 }
 
+/// A ``RollingFrequency`` complaint class that rolls the log file if it exceeds a specific size.
 @objcMembers
 final class SizeRollingFrequency: NSObject, RollingFrequency {
     
     private let maxFileSize: UInt64
     
+    /// Creates a ``SizeRollingFrequency`` instance based on size rolling strategy.
+    /// - Parameter maxFileSize: The maximum size of the log file (in bytes). If the file's size exceeds this, it will be rolled.
     init(maxFileSize: UInt64) {
         self.maxFileSize = maxFileSize
     }
@@ -420,8 +512,14 @@ final class SizeRollingFrequency: NSObject, RollingFrequency {
     }
 }
 
+/// A ``RollingFrequency`` complaint class that rolls the log file at the start of a new application session.
 @objcMembers
 final class SessionRollingFrequency: NSObject, RollingFrequency {
+    
+    /// Creates a ``SessionRollingFrequency`` instance based on app session rolling strategy.
+    override init() {
+        super.init()
+    }
     
     func shouldRoll(logFile: LogFile) -> Bool {
         if let creationTime = logFile.createdAt {
