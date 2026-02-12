@@ -159,11 +159,38 @@ final class LogFormatter: NSObject, Sendable {
 /// Manages the state of tags during the formatting process to ensure a tag is only used once.
 @objcMembers
 internal final class FormattingState: NSObject, @unchecked Sendable {
+    
+    private var _availableTags: [Tag]
+    private let lock = NSLock()
+    
     /// A mutable array of tags that have not yet been consumed by a `LogTagPart`.
-    var unformattedTags: [Tag]
+    var availableTags: [Tag] {
+        get {
+            lock.lock()
+            defer { lock.unlock() }
+            return _availableTags
+        }
+    }
       
     init(tags: [Tag]) {
-      self.unformattedTags = tags
+      _availableTags = tags
+    }
+    
+    /// Filters and removes tags that match the provided predicate in a thread-safe manner.
+    ///
+    /// This method ensures that tags are consumed atomically, preventing the same tag from being processed by multiple log parts.
+    /// - Parameter predicate: A closure that takes a ``Tag`` and returns `true` if it should be consumed.
+    /// - Returns: An array of ``Tag`` instances that matched the predicate and were removed from the state.
+    func consumeTags(where predicate: (Tag) -> Bool) -> [Tag] {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        let tagsToProcess = _availableTags.filter(predicate)
+        guard !tagsToProcess.isEmpty else { return [] }
+        
+        _availableTags.removeAll(where: predicate)
+        
+        return tagsToProcess
     }
 }
 
@@ -240,15 +267,10 @@ private final class LogTagPart: NSObject, LogPart {
     }
 
     func format(logMessage: LogMessage, formattingState: FormattingState) -> String {
-        let tagsToProcess = formattingState.unformattedTags.filter(filter)
-        guard !tagsToProcess.isEmpty else { return "" }
-        
-        // Remove the tags that have been processed so they aren't used again.
-        formattingState.unformattedTags.removeAll(where: { originalTag in
-            tagsToProcess.contains(where: { $0 === originalTag })
-        })
+        let tagsToConsume = formattingState.consumeTags(where: filter)
+        guard !tagsToConsume.isEmpty else { return "" }
 
-        let content = tagsToProcess.map(format).joined(separator: separator)
+        let content = tagsToConsume.map(format).joined(separator: separator)
         return "\(prefix)\(content)\(suffix)"
     }
 }
