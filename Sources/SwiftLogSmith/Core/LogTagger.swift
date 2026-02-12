@@ -250,16 +250,23 @@ final class LogTagger: NSObject, LogTaggerOperations {
 /// A private class that provides the underlying storage for `LogTagger`.
 private final class LogTagCollection: NSObject, @unchecked Sendable {
     
+    private var _logTags: [any LogTag]
+    private let lock = NSLock()
+    
     /// The array of ``LogTag`` instances.
-    var logTags: Array<any LogTag>
+    var logTags: [any LogTag] {
+        lock.lock()
+        defer { lock.unlock() }
+        return _logTags
+    }
     
     override init() {
-        self.logTags = []
+        _logTags = []
         super.init()
     }
     
-    init(_ logTags: Array<any LogTag>) {
-        self.logTags = Array(logTags)
+    init(_ logTags: [any LogTag]) {
+        _logTags = Array(logTags)
         super.init()
     }
     
@@ -267,11 +274,13 @@ private final class LogTagCollection: NSObject, @unchecked Sendable {
     /// - Parameter logTag: The ``LogTag`` to add.
     /// - Returns: `true` if the tag was added, `false` otherwise.
     func addTag(_ logTag: any LogTag) -> Bool {
-        if self.logTags.first(where: {$0.identifier == logTag.identifier}) != nil {
+        lock.lock()
+        defer { lock.unlock() }
+        if _logTags.first(where: {$0.identifier == logTag.identifier}) != nil {
             return false
         }
         else {
-            self.logTags.append(logTag)
+            _logTags.append(logTag)
             return true
         }
     }
@@ -280,8 +289,10 @@ private final class LogTagCollection: NSObject, @unchecked Sendable {
     /// - Parameter identifier: The unique identifier of the tag to remove.
     /// - Returns: `true` if a matching tag was found and removed, `false` otherwise.
     func removeTag(_ identifier: String) -> Bool {
-        if let tagIndex = self.logTags.firstIndex(where: {$0.identifier == identifier}) {
-            self.logTags.remove(at: tagIndex)
+        lock.lock()
+        defer { lock.unlock() }
+        if let tagIndex = _logTags.firstIndex(where: {$0.identifier == identifier}) {
+            _logTags.remove(at: tagIndex)
             return true
         }
         else {
