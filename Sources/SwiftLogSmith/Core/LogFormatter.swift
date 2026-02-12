@@ -90,6 +90,7 @@ final class LogFormatter: NSObject, Sendable {
     final class Builder: NSObject, @unchecked Sendable {
         
         private var parts: [any LogPart] = []
+        private let lock = NSLock()
         
         /// Adds the log message content into the log format.
         ///
@@ -99,7 +100,9 @@ final class LogFormatter: NSObject, Sendable {
         ///   - suffix: Text to be append after the message. By default, it will be an empty string.
         /// - Returns: The `Builder` instance for chaining.
         @discardableResult
-        public func addMessagePart(prefix: String = "", format: @escaping (String) -> String = { $0 }, suffix: String = "") -> Self {
+        public func addMessagePart(prefix: String = "", format: @escaping @Sendable (String) -> String = { $0 }, suffix: String = "") -> Self {
+            lock.lock()
+            defer { lock.unlock() }
             self.parts.append(MessagePart(prefix: prefix, format: format, suffix: suffix))
             return self
         }
@@ -112,7 +115,9 @@ final class LogFormatter: NSObject, Sendable {
         ///   - suffix: Text to be append after the metadata. By default, it will be an empty string.
         /// - Returns: The `Builder` instance for chaining.
         @discardableResult
-        public func addMetadataPart(prefix: String = "", format: @escaping ([String: String]) -> String = { "\($0)" }, suffix: String = "") -> Self {
+        public func addMetadataPart(prefix: String = "", format: @escaping @Sendable ([String: String]) -> String = { "\($0)" }, suffix: String = "") -> Self {
+            lock.lock()
+            defer { lock.unlock() }
             self.parts.append(MetadataPart(prefix: prefix, format: format, suffix: suffix))
             return self
         }
@@ -132,8 +137,10 @@ final class LogFormatter: NSObject, Sendable {
         ///   - filter: A closure to select which tags should be included in this part.
         /// - Returns: The `Builder` instance for chaining.
         @discardableResult
-        public func addTagsPart(prefix: String = "", format: @escaping (Tag) -> String = { $0.value }, separator: String = " ",
-                                suffix: String = "", filter: @escaping (Tag) -> Bool = { _ in true }) -> Self {
+        public func addTagsPart(prefix: String = "", format: @escaping @Sendable (Tag) -> String = { $0.value }, separator: String = " ",
+                                suffix: String = "", filter: @escaping @Sendable (Tag) -> Bool = { _ in true }) -> Self {
+            lock.lock()
+            defer { lock.unlock() }
             let tagPart = LogTagPart(prefix: prefix, format: format, separator: separator, suffix: suffix, filter: filter)
             self.parts.append(tagPart)
             return self
@@ -142,6 +149,8 @@ final class LogFormatter: NSObject, Sendable {
         /// Finalizes the configuration and build a new ``LogFormatter`` instance.
         /// - Returns: A new ``LogFormatter`` instance with the configured parts.
         public func build() -> LogFormatter {
+            lock.lock()
+            defer { lock.unlock() }
             return LogFormatter(parts: self.parts)
         }
     }
@@ -169,28 +178,18 @@ internal final class FormattingState: NSObject, @unchecked Sendable {
     func format(logMessage: LogMessage, formattingState: FormattingState) -> String
 }
 
-/// A base class providing common prefix and suffix properties for `LogPart` implementations.
-@objcMembers
-private class BaseLogPart: NSObject, @unchecked Sendable {
-    
-    let prefix: String
-    let suffix: String
-    
-    init(prefix: String, suffix: String) {
-        self.prefix = prefix
-        self.suffix = suffix
-    }
-}
-
 /// A `LogPart` responsible for formatting the log message string.
 @objcMembers
-private final class MessagePart: BaseLogPart, LogPart, @unchecked Sendable {
+private final class MessagePart: NSObject, LogPart {
     
-    private let format: (String) -> String
+    private let prefix: String
+    private let suffix: String
+    private let format: @Sendable (String) -> String
     
-    init(prefix: String = "", format: @escaping (String) -> String = { $0 }, suffix: String = "") {
+    init(prefix: String = "", format: @escaping @Sendable (String) -> String = { $0 }, suffix: String = "") {
+        self.prefix = prefix
         self.format = format
-        super.init(prefix: prefix, suffix: suffix)
+        self.suffix = suffix
     }
     
     func format(logMessage: LogMessage, formattingState: FormattingState) -> String {
@@ -202,13 +201,16 @@ private final class MessagePart: BaseLogPart, LogPart, @unchecked Sendable {
 
 /// A `LogPart` responsible for formatting the log metadata dictionary.
 @objcMembers
-private final class MetadataPart: BaseLogPart, LogPart, @unchecked Sendable {
+private final class MetadataPart: NSObject, LogPart {
     
-    private let format: ([String: String]) -> String
+    private let prefix: String
+    private let suffix: String
+    private let format: @Sendable ([String: String]) -> String
     
-    init(prefix: String = "", format: @escaping ([String : String]) -> String = { "\($0)" }, suffix: String = "") {
+    init(prefix: String = "", format: @escaping @Sendable ([String : String]) -> String = { "\($0)" }, suffix: String = "") {
+        self.prefix = prefix
         self.format = format
-        super.init(prefix: prefix, suffix: suffix)
+        self.suffix = suffix
     }
     
     func format(logMessage: LogMessage, formattingState: FormattingState) -> String {
@@ -220,17 +222,21 @@ private final class MetadataPart: BaseLogPart, LogPart, @unchecked Sendable {
 
 /// A `LogPart` responsible for filtering and formatting a subset of tags.
 @objcMembers
-private final class LogTagPart: BaseLogPart, LogPart, @unchecked Sendable {
+private final class LogTagPart: NSObject, LogPart {
     
-    private let filter: (Tag) -> Bool
-    private let format: (Tag) -> String
+    private let prefix: String
+    private let suffix: String
+    private let filter: @Sendable (Tag) -> Bool
+    private let format: @Sendable (Tag) -> String
     private let separator: String
 
-    init(prefix: String = "", format: @escaping (Tag) -> String = { $0.value }, separator: String = " ", suffix: String = "", filter: @escaping (Tag) -> Bool = { _ in true }) {
+    init(prefix: String = "", format: @escaping @Sendable (Tag) -> String = { $0.value }, separator: String = " ",
+         suffix: String = "", filter: @escaping @Sendable (Tag) -> Bool = { _ in true }) {
+        self.prefix = prefix
         self.format = format
+        self.suffix = suffix
         self.filter = filter
         self.separator = separator
-        super.init(prefix: prefix, suffix: suffix)
     }
 
     func format(logMessage: LogMessage, formattingState: FormattingState) -> String {
