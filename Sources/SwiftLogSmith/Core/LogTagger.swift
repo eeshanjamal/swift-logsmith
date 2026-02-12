@@ -30,7 +30,7 @@ import Foundation
 
 /// Common log tag identifier constants.
 ///
-/// This class contains some common log tag identifiers (as static constants) which can be used when creating any ``LogTag`` complaint class instance.
+/// This class contains some common log tag identifiers (as static constants) which can be used when creating any ``LogTag`` compliant class instance.
 @objcMembers
 final class LogTagIdentifiers: NSObject, Sendable {
     /// Identifier for a timestamp tag.
@@ -177,13 +177,13 @@ final class InternalTag: NSObject, LogTag {
 
     /// Adds a tag to the collection.
     /// - Parameters:
-    ///   - logTag: Any ``LogTag`` complaint class instance to add.
+    ///   - logTag: Any ``LogTag`` compliant class instance to add.
     ///   - completion: An optional closure that returns `true` if the tag was added, or `false` if a tag with the same identifier already exists.
     @objc func addTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
     
     /// Removes a tag from the collection by its instance.
     /// - Parameters:
-    ///   - logTag: Any ``LogTag`` complaint class instance to remove.
+    ///   - logTag: Any ``LogTag`` compliant class instance to remove.
     ///   - completion: An optional closure that returns `true` if a matching tag was found and removed.
     @objc func removeTag(_ logTag: any LogTag, completion: (@Sendable(Bool) -> Void)?)
     
@@ -196,7 +196,7 @@ final class InternalTag: NSObject, LogTag {
 
 /// A manager to manage a collection of ``LogTag`` instances in a thread-safe manner.
 ///
-/// It's a ``LogTaggerOperations`` complaint class providing the necessary tag collection operations.
+/// It's a ``LogTaggerOperations`` compliant class providing the necessary tag collection operations.
 /// It ensures that all operations on its instance are internally performed on a serial dispatch queue, making it safe to use from multiple threads.
 @objcMembers
 final class LogTagger: NSObject, LogTaggerOperations {

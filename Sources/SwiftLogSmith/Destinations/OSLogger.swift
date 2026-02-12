@@ -9,7 +9,7 @@
 import Foundation
 import OSLog
 
-/// An ``ILogger`` complaint class that writes to the Apple Unified Logging System (`os.Logger`).
+/// An ``ILogger`` compliant class that writes to the Apple Unified Logging System (`os.Logger`).
 ///
 /// `OSLogger` directs log messages to the system console, making them viewable in Xcode's debug area and the `Console.app`. This logger is highly efficient and is the standard for system-level logging on Apple platforms. It automatically maps the library's ``LogType`` to the corresponding `OSLogType` (e.g., ``LogType.error`` maps to `OSLogType.error`).
 ///

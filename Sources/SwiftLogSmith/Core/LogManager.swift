@@ -13,7 +13,7 @@ import Foundation
     
     /// Adds a new logger to the manager.
     /// - Parameters:
-    ///   - newLogger: Any ``ILogger`` complaint class instance to add.
+    ///   - newLogger: Any ``ILogger`` compliant class instance to add.
     ///   - minLogLevel: The minimum ``LogLevel`` this logger should handle.
     ///   - minLogType: The minimum ``LogType`` this logger should handle.
     ///   - completion: An optional closure that returns `true` if the logger was added, or `false` if it was already present.
@@ -21,13 +21,13 @@ import Foundation
     
     /// Removes a logger from the manager.
     /// - Parameters:
-    ///   - logger: Any ``ILogger`` complaint class instance to remove.
+    ///   - logger: Any ``ILogger`` compliant class instance to remove.
     ///   - completion: An optional closure that returns `true` if the logger was found and removed.
     @objc func removeLogger(logger: any ILogger, completion: (@Sendable(Bool) -> Void)?)
     
     /// Replaces the default logger with a new one.
     /// - Parameters:
-    ///   - newLogger: Any new ``ILogger`` complaint class instance to set as the default.
+    ///   - newLogger: Any new ``ILogger`` compliant class instance to set as the default.
     ///   - minLogLevel: The minimum ``LogLevel`` the new default logger should handle.
     ///   - minLogType: The minimum ``LogType`` the new default logger should handle.
     ///   - completion: An optional closure that returns `true` if the default logger was successfully replaced.
@@ -85,7 +85,7 @@ final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @un
     ///
     /// - Parameters:
     ///   - identifier: A unique string to identify this manager. It helps in storing instance specific properties (e.g., `minLogLevel` or `minLogType`) in persistance storage (such as `UserDefaults`).
-    ///   - defaultLogger: Any ``ILogger`` complaint class instance to use as default logger. It's mandatory because log manager instances must always have at least one logger (as default).
+    ///   - defaultLogger: Any ``ILogger`` compliant class instance to use as default logger. It's mandatory because log manager instances must always have at least one logger (as default).
     ///   - minLogLevel: The minimum ``LogLevel`` for the default logger. Defaults to `.default` (which means available to all log levels).
     ///   - minLogType: The minimum ``LogType`` for the default logger. Defaults to `.none` (which means available to all log types).
     public init(identifier: String, defaultLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none) {

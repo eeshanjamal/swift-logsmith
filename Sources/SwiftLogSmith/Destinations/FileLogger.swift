@@ -33,7 +33,7 @@ import ZIPFoundation
     case descending
 }
 
-/// An ``ILogger`` complaint class that logs to a file.
+/// An ``ILogger`` compliant class that logs to a file.
 ///
 /// `FileLogger` formats the raw `LogMessage` into a formatted one and forward it to the ``FileLoggerManager`` instance which actually manages the file I/O operations.
 ///
@@ -478,7 +478,7 @@ final class LogFile: NSObject, Sendable {
     @objc func shouldRoll(logFile: LogFile) -> Bool
 }
 
-/// A ``RollingFrequency`` complaint class that rolls the log file if it's older than a specified time interval.
+/// A ``RollingFrequency`` compliant class that rolls the log file if it's older than a specified time interval.
 @objcMembers
 final class TimeRollingFrequency: NSObject, RollingFrequency {
     
@@ -502,7 +502,7 @@ final class TimeRollingFrequency: NSObject, RollingFrequency {
     }
 }
 
-/// A ``RollingFrequency`` complaint class that rolls the log file if it exceeds a specific size.
+/// A ``RollingFrequency`` compliant class that rolls the log file if it exceeds a specific size.
 @objcMembers
 final class SizeRollingFrequency: NSObject, RollingFrequency {
     
@@ -519,7 +519,7 @@ final class SizeRollingFrequency: NSObject, RollingFrequency {
     }
 }
 
-/// A ``RollingFrequency`` complaint class that rolls the log file at the start of a new application session.
+/// A ``RollingFrequency`` compliant class that rolls the log file at the start of a new application session.
 @objcMembers
 final class SessionRollingFrequency: NSObject, RollingFrequency {
     
