@@ -294,7 +294,10 @@ private final class ResultTracker: @unchecked Sendable {
     }
 }
 
-/// A helper class that uses the visitor pattern to convert ``LogTag`` protocol instances into concrete ``Tag`` data objects.
+/// A helper class that uses the visitor pattern to convert ``LogTag`` protocol instances into concrete ``Tag`` data instances.
+///
+/// > Note: This class is not internally thread-safe and is marked as `@unchecked Sendable` because it is intended for use exclusively within
+/// the single-threaded context of the `LogManager`'s serial dispatch queue. It shouldn't be shared across concurrent domains before actually making it thread-safe.
 private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
     
     private var tags = [Tag]()
