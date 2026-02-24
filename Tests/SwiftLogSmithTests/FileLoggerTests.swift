@@ -46,10 +46,19 @@ final class FileLoggerTests: XCTestCase {
         }
         
         // Assert
-        let files = manager.listLogFiles()
-        XCTAssertEqual(files.count, 1)
-        
-        let content = try String(contentsOf: files[0].url, encoding: .utf8)
-        XCTAssertTrue(content.contains(messageText))
+        expectCompletion(description: "verify write should complete", timeout: 2.0) { fulfill in
+            manager.listLogFiles { files in
+                XCTAssertEqual(files.count, 1)
+                
+                do {
+                    let firstFile = try XCTUnwrap(files.first)
+                    let content = try String(contentsOf: firstFile.url, encoding: .utf8)
+                    XCTAssertTrue(content.contains(messageText))
+                } catch {
+                    XCTFail("Failed to verify log file: \(error)")
+                }
+                fulfill()
+            }
+        }
     }
 }

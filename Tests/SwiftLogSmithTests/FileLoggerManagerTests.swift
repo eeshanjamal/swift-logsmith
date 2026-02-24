@@ -83,13 +83,20 @@ final class FileLoggerManagerTests: XCTestCase {
         }
         
         // Assert
-        let logFiles = sut.listLogFiles()
-        XCTAssertEqual(logFiles.count, 1, "There should be one log file created")
-        
-        let firstLogFile = try XCTUnwrap(logFiles.first)
-        let fileContent = try String(contentsOf: firstLogFile.url, encoding: .utf8)
-        
-        XCTAssertEqual(fileContent, "\(logMessage)\n", "The file content should match the logged message plus a newline")
+        expectCompletion(description: "verify write operation should complete", timeout: 2.0) { fulfill in
+            sut.listLogFiles { logFiles in
+                XCTAssertEqual(logFiles.count, 1, "There should be one log file created")
+                
+                do {
+                    let firstLogFile = try XCTUnwrap(logFiles.first)
+                    let fileContent = try String(contentsOf: firstLogFile.url, encoding: .utf8)
+                    XCTAssertEqual(fileContent, "\(logMessage)\n", "The file content should match the logged message plus a newline")
+                } catch {
+                    XCTFail("Failed to verify newly created log file: \(error)")
+                }
+                fulfill()
+            }
+        }
     }
 
     func testRolling_BySize() throws {
@@ -115,29 +122,42 @@ final class FileLoggerManagerTests: XCTestCase {
             }
         }
         
+        // Capture local copies to avoid capturing self
+        let testDir = self.testDirectoryURL!
+        
         // Assert
-        let logFiles = sut.listLogFiles()
-        let archives = logFiles.filter { $0.url.pathExtension == "zip" }
-        let activeLogs = logFiles.filter { $0.url.pathExtension == "log" }
-        
-        XCTAssertEqual(archives.count, 1, "There should be one archived file")
-        XCTAssertEqual(activeLogs.count, 1, "There should be one new active log file")
-        
-        // Verify content of the archived file
-        let archiveURL = try XCTUnwrap(archives.first?.url)
-        let unarchivedDir = testDirectoryURL.appendingPathComponent("unarchived")
-        try fileManager.createDirectory(at: unarchivedDir, withIntermediateDirectories: false, attributes: nil)
-        try fileManager.unzipItem(at: archiveURL, to: unarchivedDir)
-        
-        let unzippedFiles = try fileManager.contentsOfDirectory(at: unarchivedDir, includingPropertiesForKeys: nil)
-        XCTAssertEqual(unzippedFiles.count, 1)
-        let unzippedContent = try String(contentsOf: try XCTUnwrap(unzippedFiles.first), encoding: .utf8)
-        XCTAssertEqual(unzippedContent, "\(log1)\n")
-        
-        // Verify content of the new active log file
-        let newLogURL = try XCTUnwrap(activeLogs.first?.url)
-        let newLogContent = try String(contentsOf: newLogURL, encoding: .utf8)
-        XCTAssertEqual(newLogContent, "\(log2)\n")
+        expectCompletion(description: "verify rolling by size should complete", timeout: 2.0) { fulfill in
+            sut.listLogFiles { logFiles in
+                let archives = logFiles.filter { $0.url.pathExtension == "zip" }
+                let activeLogs = logFiles.filter { $0.url.pathExtension == "log" }
+                
+                XCTAssertEqual(archives.count, 1, "There should be one archived file")
+                XCTAssertEqual(activeLogs.count, 1, "There should be one new active log file")
+                
+                do {
+                    // Verify content of the archived file
+                    let archiveURL = try XCTUnwrap(archives.first?.url)
+                    let unarchivedDir = testDir.appendingPathComponent("unarchived")
+                    try FileManager.default.createDirectory(at: unarchivedDir, withIntermediateDirectories: false, attributes: nil)
+                    try FileManager.default.unzipItem(at: archiveURL, to: unarchivedDir)
+                    
+                    let unzippedFiles = try FileManager.default.contentsOfDirectory(at: unarchivedDir, includingPropertiesForKeys: nil)
+                    XCTAssertEqual(unzippedFiles.count, 1)
+                    
+                    let firstUnzippedFile = try XCTUnwrap(unzippedFiles.first)
+                    let unzippedContent = try String(contentsOf: firstUnzippedFile, encoding: .utf8)
+                    XCTAssertEqual(unzippedContent, "\(log1)\n")
+                    
+                    // Verify content of the new active log file
+                    let newLogURL = try XCTUnwrap(activeLogs.first?.url)
+                    let newLogContent = try String(contentsOf: newLogURL, encoding: .utf8)
+                    XCTAssertEqual(newLogContent, "\(log2)\n")
+                } catch {
+                    XCTFail("test rolling by size verification failed: \(error)")
+                }
+                fulfill()
+            }
+        }
     }
 
     func testRolling_ByTime() throws {
@@ -167,17 +187,25 @@ final class FileLoggerManagerTests: XCTestCase {
         }
         
         // Assert
-        let logFiles = sut.listLogFiles()
-        let archives = logFiles.filter { $0.url.pathExtension == "zip" }
-        let activeLogs = logFiles.filter { $0.url.pathExtension == "log" }
-        
-        XCTAssertEqual(archives.count, 1, "There should be one archived file after time-based roll")
-        XCTAssertEqual(activeLogs.count, 1, "There should be one new active log file")
-        
-        // Verify content of the new active log file
-        let newLogURL = try XCTUnwrap(activeLogs.first?.url)
-        let newLogContent = try String(contentsOf: newLogURL, encoding: .utf8)
-        XCTAssertEqual(newLogContent, "\(log2)\n")
+        expectCompletion(description: "verify rolling by time should complete", timeout: 2.0) { fulfill in
+            sut.listLogFiles { logFiles in
+                let archives = logFiles.filter { $0.url.pathExtension == "zip" }
+                let activeLogs = logFiles.filter { $0.url.pathExtension == "log" }
+                
+                XCTAssertEqual(archives.count, 1, "There should be one archived file after time-based roll")
+                XCTAssertEqual(activeLogs.count, 1, "There should be one new active log file")
+                
+                do {
+                    // Verify content of the new active log file
+                    let newLogURL = try XCTUnwrap(activeLogs.first?.url)
+                    let newLogContent = try String(contentsOf: newLogURL, encoding: .utf8)
+                    XCTAssertEqual(newLogContent, "\(log2)\n")
+                } catch {
+                    XCTFail("test rolling by time verification failed: \(error)")
+                }
+                fulfill()
+            }
+        }
     }
 
     func testPurging_ByCount() throws {
@@ -203,7 +231,7 @@ final class FileLoggerManagerTests: XCTestCase {
         )
 
         // 3. Write to an initial log file. This file will be the one that gets rolled.
-        expectCompletion(description: "Initial write", timeout: 2.0) { fulfill in
+        expectCompletion(description: "Initial write for purge (by count) should complete", timeout: 2.0) { fulfill in
             sut.write(log: "This is the initial log file content.") { error in
                 XCTAssertNil(error)
                 fulfill()
@@ -211,28 +239,39 @@ final class FileLoggerManagerTests: XCTestCase {
         }
         
         // Sanity check: we should have 2 archives and 1 log file before the purge-triggering roll
-        XCTAssertEqual(sut.listLogFiles(filterByExtensions: ["zip"]).count, 2)
-        XCTAssertEqual(sut.listLogFiles(filterByExtensions: ["log"]).count, 1)
+        expectCompletion(description: "Befor purge (by count) files sanity check should complete", timeout: 2.0) { fulfill in
+            sut.listLogFiles(filterByExtensions: ["zip"]) { archives in
+                XCTAssertEqual(archives.count, 2)
+                sut.listLogFiles(filterByExtensions: ["log"]) { logs in
+                    XCTAssertEqual(logs.count, 1)
+                    fulfill()
+                }
+            }
+        }
 
         // Act
         // This second write will trigger a roll because the file is no longer empty (size > 1),
         // creating a 3rd archive. The purge logic should then execute.
-        expectCompletion(description: "Final write that triggers purge", timeout: 2.0) { fulfill in
-            sut.write(log: "This log triggers the purge.") { error in
+        expectCompletion(description: "Write that triggers purge (by count) should complete", timeout: 2.0) { fulfill in
+            sut.write(log: "This log triggers the purge (by count).") { error in
                 XCTAssertNil(error)
                 fulfill()
             }
         }
 
         // Assert
-        let finalArchives = sut.listLogFiles(filterByExtensions: ["zip"])
-        XCTAssertEqual(finalArchives.count, 2, "Should be exactly 2 archives remaining after purge")
-        
-        let remainingArchiveNames = finalArchives.map { $0.name }
-        XCTAssertFalse(remainingArchiveNames.contains("archive_oldest.zip"), "The oldest archive should have been deleted")
-        XCTAssertTrue(remainingArchiveNames.contains("archive_newer.zip"), "The newer original archive should remain")
-        // The third archive is the one created from rolling the "initial content" log file.
-        XCTAssertEqual(finalArchives.filter { $0.name != "archive_newer.zip" }.count, 1, "The newly created archive should be present")
+        expectCompletion(description: "Verify final archives post purge (by count) should complete", timeout: 2.0) { fulfill in
+            sut.listLogFiles(filterByExtensions: ["zip"]) { finalArchives in
+                XCTAssertEqual(finalArchives.count, 2, "Should be exactly 2 archives remaining after purge")
+                
+                let remainingArchiveNames = finalArchives.map { $0.name }
+                XCTAssertFalse(remainingArchiveNames.contains("archive_oldest.zip"), "The oldest archive should have been deleted")
+                XCTAssertTrue(remainingArchiveNames.contains("archive_newer.zip"), "The newer original archive should remain")
+                // The third archive is the one created from rolling the "initial content" log file.
+                XCTAssertEqual(finalArchives.filter { $0.name != "archive_newer.zip" }.count, 1, "The newly created archive should be present")
+                fulfill()
+            }
+        }
     }
 
     func testPurging_BySize() throws {
@@ -251,35 +290,54 @@ final class FileLoggerManagerTests: XCTestCase {
         )
 
         // 1. Create first archive and capture its name
-        expectCompletion(description: "First two writes", fulfillmentCount: 2, timeout: 2.0) { fulfill in
+        expectCompletion(description: "First two writes in purge (by size) should complete", fulfillmentCount: 2, timeout: 2.0) { fulfill in
             sut.write(log: "\(logMessage) 1") { _ in fulfill() }
             Thread.sleep(forTimeInterval: 0.1)
             sut.write(log: "\(logMessage) 2") { _ in fulfill() }
         }
         
-        let initialArchives = sut.listLogFiles(filterByExtensions: ["zip"], sortBy: .createdAt, order: .ascending)
-        XCTAssertEqual(initialArchives.count, 1, "Should have 1 archive after two writes")
-        let firstArchiveName = try XCTUnwrap(initialArchives.first?.name)
-        XCTAssertFalse(firstArchiveName.isEmpty, "First archive name should not be empty")
-        
-        // 2. Trigger purge by writing more logs
-        expectCompletion(description: "Next two writes", fulfillmentCount: 2, timeout: 2.0) { fulfill in
-            sut.write(log: "\(logMessage) 3") { _ in fulfill() }
-            Thread.sleep(forTimeInterval: 0.1)
-            sut.write(log: "\(logMessage) 4") { _ in fulfill() }
+        expectCompletion(description: "Purge (by size) logic flow should complete", timeout: 5.0) { fulfill in
+            // Step 1: Get initial archive name
+            sut.listLogFiles(filterByExtensions: ["zip"], sortBy: .createdAt, order: .ascending) { initialArchives in
+                XCTAssertEqual(initialArchives.count, 1, "Should have 1 archive after two writes")
+                
+                let archiveName: String
+                do {
+                    archiveName = try XCTUnwrap(initialArchives.first?.name)
+                    XCTAssertFalse(archiveName.isEmpty, "First archive name should not be empty")
+                } catch {
+                    XCTFail("Failed to unwrap archive name: \(error)")
+                    fulfill()
+                    return
+                }
+                
+                // Step 2: Trigger purge by writing more logs (nested inside to keep archiveName in scope)
+                let group = DispatchGroup()
+                
+                group.enter()
+                sut.write(log: "\(logMessage) 3") { _ in group.leave() }
+                
+                group.enter()
+                Thread.sleep(forTimeInterval: 0.1)
+                sut.write(log: "\(logMessage) 4") { _ in group.leave() }
+                
+                group.notify(queue: .global()) {
+                    // Step 3: Verify
+                    sut.listLogFiles(filterByExtensions: ["zip"]) { finalArchives in
+                        let totalSize = finalArchives.reduce(0) { $0 + $1.size }
+
+                        // After 4 writes, 3 archives were created.
+                        // The purge should delete oldest archives to bring total under limit.
+                        XCTAssertEqual(finalArchives.count, 2, "Should be 2 archives remaining after purging by size")
+                        XCTAssertTrue(totalSize <= sut.maximumDirectorySize, "Total size of archives (\(totalSize)) should be under the limit of \(sut.maximumDirectorySize)")
+                        
+                        let finalArchiveNames = finalArchives.map { $0.name }
+                        XCTAssertFalse(finalArchiveNames.contains(archiveName), "The oldest archive (\(archiveName)) should have been purged")
+                        fulfill()
+                    }
+                }
+            }
         }
-
-        // Assert
-        let finalArchives = sut.listLogFiles(filterByExtensions: ["zip"])
-        let totalSize = finalArchives.reduce(0) { $0 + $1.size }
-
-        // After 4 writes, 3 archives were created.
-        // The purge should delete oldest archives to bring total under limit.
-        XCTAssertEqual(finalArchives.count, 2, "Should be 2 archives remaining after purging by size")
-        XCTAssertTrue(totalSize <= sut.maximumDirectorySize, "Total size of archives (\(totalSize)) should be under the limit of \(sut.maximumDirectorySize)")
-        
-        let finalArchiveNames = finalArchives.map { $0.name }
-        XCTAssertFalse(finalArchiveNames.contains(firstArchiveName), "The oldest archive (\(firstArchiveName)) should have been purged")
     }
 
     func testClearLogs() throws {
@@ -297,7 +355,12 @@ final class FileLoggerManagerTests: XCTestCase {
         }
         
         // Sanity check: ensure files exist before clearing
-        XCTAssertTrue(sut.listLogFiles().count > 0, "Should have files before clearing")
+        expectCompletion(description: "Sanity check before clear logs operation should complete", timeout: 2.0) { fulfill in
+            sut.listLogFiles { logFiles in
+                XCTAssertTrue(logFiles.count > 0, "Should have files before clearing")
+                fulfill()
+            }
+        }
         
         // Act: Clear all logs
         expectCompletion(description: "Clear logs operation should complete", timeout: 2.0) { fulfill in
@@ -308,7 +371,11 @@ final class FileLoggerManagerTests: XCTestCase {
         }
         
         // Assert
-        let remainingFiles = sut.listLogFiles()
-        XCTAssertEqual(remainingFiles.count, 0, "All log files and archives should be deleted")
+        expectCompletion(description: "Verify no files remaining after clear logs operation should complete", timeout: 2.0) { fulfill in
+            sut.listLogFiles { remainingFiles in
+                XCTAssertEqual(remainingFiles.count, 0, "All log files and archives should be deleted")
+                fulfill()
+            }
+        }
     }
 }
