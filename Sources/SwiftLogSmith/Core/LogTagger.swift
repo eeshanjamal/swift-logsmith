@@ -80,6 +80,18 @@ final class LogTagIdentifiers: NSObject, Sendable {
     }
 }
 
+/// A utility class providing Objective-C compatible access to `InternalTagType` properties.
+@objcMembers
+final class InternalTagTypeUtils: NSObject, Sendable {
+    
+    /// Returns the string value of an `InternalTagType`.
+    /// - Parameter tagType: The `InternalTagType` enum.
+    /// - Returns: The string representation (e.g., "file" for .file).
+    public static func stringValue(for tagType: InternalTagType) -> String {
+        return tagType.stringValue
+    }
+}
+
 /// A protocol for visiting concrete implementations of ``LogTag``.
 ///
 /// This protocol allows to process different `LogTag` implementations (e.g., `InternalTag`, `ExternalTag`) in a type-safe manner without casting.

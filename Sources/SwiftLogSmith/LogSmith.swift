@@ -393,6 +393,32 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
     }
 }
 
+/// A utility class providing Objective-C compatible access to `LogType` properties.
+@objcMembers
+final class LogTypeUtils: NSObject, Sendable  {
+    
+    /// Returns the string value of a `LogType`.
+    /// - Parameter logType: The `LogType` enum.
+    /// - Returns: The string representation (e.g., "debug" for .debug).
+    public static func stringValue(for logType: LogType) -> String {
+        return logType.stringValue
+    }
+    
+    /// Returns the symbolic value of a `LogType`.
+    /// - Parameter logType: The `LogType` enum.
+    /// - Returns: The symbolic representation (e.g., "D" for .debug).
+    public static func symbolicValue(for logType: LogType) -> String {
+        return logType.symbolicValue
+    }
+    
+    /// Returns the corresponding `LogLevel` for a `LogType`.
+    /// - Parameter logType: The `LogType` enum.
+    /// - Returns: The mapped `LogLevel`.
+    public static func logLevel(for logType: LogType) -> LogLevel {
+        return logType.logLevel
+    }
+}
+
 /// Represents different level (or severity) for logging.
 ///
 /// Provides a broader way to categorize logs, which can be used for high-level filtering.
