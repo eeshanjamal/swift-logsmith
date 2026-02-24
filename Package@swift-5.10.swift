@@ -35,6 +35,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20")
+        .package(url: "https://github.com/apple/swift-docc-plugin", exact: "1.3.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
