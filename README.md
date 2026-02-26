@@ -1,12 +1,32 @@
-# swift-logsmith
+# SwiftLogSmith
 
-A lightweight and flexible logging library for Swift.
+A lightweight, flexible, and thread-safe logging library for Swift, designed to make logging effortless yet powerful. Built with support for **Swift 6 Concurrency** and full **Objective-C compatibility**.
 
-## Usage
+[![Swift 5.10](https://img.shields.io/badge/Swift-5.10-orange.svg)](https://swift.org)
+[![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
+[![Platforms](https://img.shields.io/badge/Platforms-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-lightgrey.svg)](https://developer.apple.com)
+[![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen)](https://github.com/eeshanjamal/swift-logsmith)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Note:** This library is currently under development. The API is not yet stable.
+## Overview
 
-To use `swift-logsmith` in your project, add it as a dependency in your `Package.swift` file:
+**SwiftLogSmith** is built to get you logging immediately with zero configuration while offering deep customization for advanced needs. Whether you need simple console output or complex file logging with rotation and archiving, SwiftLogSmith handles it with a clean, modern API that is safe for modern concurrent Swift environments.
+
+## Key Features
+
+- **🚀 Zero Config:** Start logging instantly with `LogSmith.log()`. No setup required.
+- **🖥️ System Logging:** Seamless integration with Apple's unified logging system (`os.Logger`) via `OSLogger`.
+- **📂 File Logging:** Robust file logging with `FileLogger`, featuring automatic rolling, archiving (ZIP), and purging based on size or time.
+- **🏷️ Contextual Tags:** Add global or per-logger tags (e.g., `[User: 123]`, `[Env: Dev]`) to track context across your logs.
+- **🎨 Custom Formatting:** Design your own log format using the powerful `LogFormatter` builder pattern.
+- **🔒 Thread Safe:** All operations are thread-safe, utilizing serial dispatch queues and modern Swift 6 concurrency principles.
+- **🔌 Obj-C Support:** Designed to be easily used in mixed Swift and Objective-C projects.
+
+## Installation
+
+Add `SwiftLogSmith` to your project via Swift Package Manager.
+
+### Package.swift
 
 ```swift
 dependencies: [
@@ -14,16 +34,115 @@ dependencies: [
 ]
 ```
 
-Then, import the library in your code:
+## Quick Start
+
+Import the library and start logging. By default, logs are directed to the system console.
 
 ```swift
 import SwiftLogSmith
+
+// 1. Simple Log
+LogSmith.log("Application launched 🚀")
+
+// 2. Error Log with Metadata
+LogSmith.logE("Network request failed", metadata: ["error_code": "404"])
+
+// 3. Debug Log
+LogSmith.logD("User tapped button")
 ```
 
-## Compatibility
+## Advanced Usage
 
-This library is compatible with Swift 5.10 and later.
+### 1. Adding Context with Tags
+
+Tags allow you to attach persistent context to your logs, making filtering and debugging easier.
+
+```swift
+// Add a static tag
+LogSmith.addTag(ExternalTag(identifier: "Env", value: "Staging"))
+
+// Add a dynamic tag (evaluated at runtime)
+LogSmith.addTag(ExternalTag(identifier: "Date", valueProvider: { Date().description }))
+
+// Output: [Env: Staging] [2026-02-24 10:30:00 +0000] [I] User logged in
+LogSmith.logI("User logged in")
+```
+
+### 2. File Logging
+
+Configure `FileLogger` to write logs to disk with automatic file management.
+
+```swift
+do {
+    // Configure file management: Roll logs every 1 hour, keep max 10 archives
+    let manager = try FileLoggerManager(
+        rollingFrequency: TimeRollingFrequency(rollingInterval: 3600),
+        maximumArchiveFiles: 10
+    )
+    
+    // Create the logger
+    let fileLogger = FileLogger(fileLoggerManager: manager)
+    
+    // Add to LogSmith
+    LogSmith.addLogger(newLogger: fileLogger)
+} catch {
+    print("Failed to initialize FileLogger: \(error)")
+}
+```
+
+### 3. Custom Formatting
+
+Take full control over how your log messages look by replacing the default logger with a customized one.
+
+```swift
+// 1. Build a custom formatter
+let customFormatter = LogFormatter.Builder()
+    .addTagsPart(prefix: "[", suffix: "] ", filter: { $0.identifier == "Env" }) // Show environment tag value with custom prefix & postfix
+    .addMessagePart(prefix: "📢 ") // Add an emoji before every message
+    .build()
+
+// 2. Replace the default OSLogger with one using your custom formatter
+let myLogger = OSLogger(logFormatter: customFormatter)
+LogSmith.replaceDefaultLogger(with: myLogger)
+
+// 3. Log a message
+LogSmith.addTag(ExternalTag(identifier: "Env", value: "Production"))
+LogSmith.log("Network status is stable")
+
+// Expected Output:
+// [Production] 📢 Network status is stable
+```
+
+## Architecture
+
+SwiftLogSmith follows a modular design to separate data gathering, formatting, and output.
+
+```mermaid
+graph TD
+    User([User Call]) --> LogSmith[LogSmith Interface]
+    LogSmith --> LogManager[LogManager]
+    LogManager --> Tagger[LogTagger]
+    Tagger --> Message[LogMessage]
+    LogManager --> Dest1[OSLogger]
+    LogManager --> Dest2[FileLogger]
+    
+    subgraph Logging Destinations
+        Dest1
+        Dest2
+    end
+    
+    Dest1 --> Formatter1[LogFormatter]
+    Dest2 --> Formatter2[LogFormatter]
+    
+    Formatter1 --> Output1[System Console]
+    Formatter2 --> Output2[Disk / .log & .zip]
+```
+
+## Documentation
+
+Full API documentation is available here:  
+[**Read the Documentation**](https://eeshanjamal.github.io/swift-logsmith/documentation/swiftlogsmith/)
 
 ## License
 
-`swift-logsmith` is released under the MIT license. See [LICENSE](LICENSE) for details.
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
