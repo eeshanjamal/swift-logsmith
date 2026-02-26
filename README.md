@@ -23,9 +23,17 @@ A lightweight, flexible, and thread-safe logging library for Swift, designed to 
 
 ## Installation
 
-Add `SwiftLogSmith` to your project via Swift Package Manager.
+### Xcode Project
 
-### Package.swift
+1. Open your project in Xcode.
+2. Go to **File** > **Add Package Dependencies...**.
+3. Enter the repository URL: `https://github.com/eeshanjamal/swift-logsmith.git`
+4. Select the version or branch you want to use.
+5. Click **Add Package**.
+
+### Swift Package
+
+Add `SwiftLogSmith` to your `Package.swift` file:
 
 ```swift
 dependencies: [
