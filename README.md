@@ -1,6 +1,6 @@
 # SwiftLogSmith
 
-A lightweight, flexible, and thread-safe logging library for Swift, designed to make logging effortless yet powerful. Built with support for **Swift 6 Concurrency** and full **Objective-C compatibility**.
+A lightweight, flexible, and thread-safe logging library for Swift, designed to make logging effortless yet powerful. Built with support for **Swift 6 Concurrency yet Objective-C interoperability**.
 
 [![Swift 5.10](https://img.shields.io/badge/Swift-5.10-orange.svg)](https://swift.org)
 [![Swift 6.0](https://img.shields.io/badge/Swift-6.0-orange.svg)](https://swift.org)
@@ -16,11 +16,11 @@ A lightweight, flexible, and thread-safe logging library for Swift, designed to 
 
 - **🚀 Zero Config:** Start logging instantly with `LogSmith.log()`. No setup required.
 - **🖥️ System Logging:** Seamless integration with Apple's unified logging system (`os.Logger`) via `OSLogger`.
-- **📂 File Logging:** Robust file logging with `FileLogger`, featuring automatic rolling, archiving (ZIP), and purging based on size or time.
+- **📂 File Logging:** Robust file logging with `FileLogger`, featuring automatic rolling, archiving, and purging based on variety of `RollingFrequency` implementations.
 - **🏷️ Contextual Tags:** Add global or per-logger tags (e.g., `[User: 123]`, `[Env: Dev]`) to track context across your logs.
 - **🎨 Custom Formatting:** Design your own log format using the powerful `LogFormatter` builder pattern.
-- **🔒 Thread Safe:** All operations are thread-safe, utilizing serial dispatch queues and modern Swift 6 concurrency principles.
-- **🔌 Obj-C Support:** Designed to be easily used in mixed Swift and Objective-C projects.
+- **🔒 Thread Safe:** All operations are thread-safe, following modern Swift 6 concurrency principles.
+- **🔌 Obj-C Support:** Designed to be easily used in Swift and Objective-C interoperable projects.
 
 ## Installation
 
@@ -119,23 +119,27 @@ SwiftLogSmith follows a modular design to separate data gathering, formatting, a
 
 ```mermaid
 graph TD
-    User([User Call]) --> LogSmith[LogSmith Interface]
+    User([User Call]) --> LogSmith[LogSmith]
     LogSmith --> LogManager[LogManager]
-    LogManager --> Tagger[LogTagger]
-    Tagger --> Message[LogMessage]
-    LogManager --> Dest1[OSLogger]
-    LogManager --> Dest2[FileLogger]
+
+    LogManager --> Construct{Construct LogMessages}
     
-    subgraph Logging Destinations
-        Dest1
-        Dest2
+    Construct -->|Message + Meta + Tags| Message1[LogMessage 1]
+    Construct -->|Message + Meta + Tags| Message2[LogMessage 2]
+
+    Message1 --> Dest1[OSLogger]
+    Message2 --> Dest2[FileLogger]
+
+    subgraph "Logger 2"
+        Dest2 --> Formatter2[LogFormatter]
+        Formatter2 --> Output2[Disk]
+    end
+
+    subgraph "Logger 1"
+        Dest1 --> Formatter1[LogFormatter]
+        Formatter1 --> Output1[System Console]
     end
     
-    Dest1 --> Formatter1[LogFormatter]
-    Dest2 --> Formatter2[LogFormatter]
-    
-    Formatter1 --> Output1[System Console]
-    Formatter2 --> Output2[Disk / .log & .zip]
 ```
 
 ## Documentation
