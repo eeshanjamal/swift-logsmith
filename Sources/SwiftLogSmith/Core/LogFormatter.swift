@@ -6,7 +6,7 @@
 //  SPDX-License-Identifier: MIT
 //
 
-import Foundation
+public import Foundation
 
 /// A customizable formatter that transforms a ``LogMessage`` instance into a final string representation for output.
 ///
@@ -45,7 +45,7 @@ import Foundation
 /// >Note: Even though the `LogMessage` have the date & metadata as well but just because custom formatter doesn't include it. It will not appear in the final log output.
 
 @objcMembers
-final class LogFormatter: NSObject, Sendable {
+public final class LogFormatter: NSObject, Sendable {
     
     private let parts: [any LogPart]
     private static let logTypeValues = LogType.allCases.map { $0.stringValue }
@@ -87,7 +87,7 @@ final class LogFormatter: NSObject, Sendable {
     
     /// A helper class for constructing a custom ``LogFormatter``.
     @objcMembers
-    final class Builder: NSObject, @unchecked Sendable {
+    public final class Builder: NSObject, @unchecked Sendable {
         
         private var parts: [any LogPart] = []
         private let lock = NSLock()

@@ -6,7 +6,7 @@
 //  SPDX-License-Identifier: MIT
 //
 
-import Foundation
+public import Foundation
 
 /// The primary, easy-to-use entry point for logging in your application.
 ///
@@ -43,7 +43,7 @@ import Foundation
 /// // Output: 2023-10-25 14:30:00 +0000 [D] User action
 /// ```
 @objcMembers
-final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
+public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
     
     /// The timestamp when the `LogSmith` session was launched.
     /// This is used by `SessionRollingFrequency` to determine if a log file from a previous session needs to be rolled.
@@ -338,7 +338,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
     /// This returns a lowercase string corresponding to the enum case (e.g., "debug", "error").
     ///
     /// > Note: For `.undefined` and `.none`, it returns an empty string.
-    var stringValue: String {
+    public var stringValue: String {
         switch self {
             case .undefined, .none:
                 return ""
@@ -366,7 +366,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
     /// This typically returns the first letter of the `stringValue` in uppercase (e.g., "D" for debug, "E" for error).
     ///
     /// >Note: For cases with empty `stringValue`, it also returns an empty string.
-    var symbolicValue: String {
+    public var symbolicValue: String {
         return stringValue.isEmpty ? stringValue : stringValue.prefix(1).uppercased()
     }
     
@@ -375,7 +375,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
     /// This mapping is used for identifying the `LogLevel` where Multiple `LogType` might fall under a single `LogLevel`.
     ///
     /// For example, both `LogType.warning` and `LogType.error` map to `LogLevel.error`.
-    var logLevel: LogLevel {
+    public var logLevel: LogLevel {
         switch self {
             case .undefined:
                 return .undefined
@@ -395,7 +395,7 @@ final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations {
 
 /// A utility class providing Objective-C compatible access to `LogType` properties.
 @objcMembers
-final class LogTypeUtils: NSObject, Sendable  {
+public final class LogTypeUtils: NSObject, Sendable  {
     
     /// Returns the string value of a `LogType`.
     /// - Parameter logType: The `LogType` enum.

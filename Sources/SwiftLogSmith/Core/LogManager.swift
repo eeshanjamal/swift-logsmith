@@ -6,7 +6,7 @@
 //  SPDX-License-Identifier: MIT
 //
 
-import Foundation
+public import Foundation
 
 /// A protocol defining the core operations for managing a collection of loggers.
 @objc internal protocol LogManagerOperations: Sendable {
@@ -64,7 +64,7 @@ extension UserDefaults {
 /// >Note: Usually, you don't need to interact directly with this class because all its operations are already facilitated by ``LogSmith``.
 /// However, if your use case is not covered by ``LogSmith`` or you need multiple instances of `LogManager` to manage your logging then you can use it directly.
 @objcMembers
-final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @unchecked Sendable {
+public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperations, @unchecked Sendable {
     
     internal enum defaults: String {
         case minimumLogLevel

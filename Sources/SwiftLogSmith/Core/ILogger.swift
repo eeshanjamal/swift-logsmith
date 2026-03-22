@@ -38,7 +38,7 @@ import Foundation
 ///     }
 /// }
 /// ```
-@objc protocol ILogger: Sendable {
+@objc public protocol ILogger: Sendable {
     
     /// An optional ``LogTagger`` instance used to append contextual tags automatically to log messages.
     ///

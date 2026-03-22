@@ -6,7 +6,7 @@
 //  SPDX-License-Identifier: MIT
 //
 
-import Foundation
+public import Foundation
 import ZIPFoundation
 
 /// An enum to sort the list of log files.
@@ -64,10 +64,10 @@ import ZIPFoundation
 /// }
 /// ```
 @objcMembers
-final class FileLogger: NSObject, ILogger {
+public final class FileLogger: NSObject, ILogger {
     
-    let tagger: LogTagger?
-    let formatter: LogFormatter
+    public let tagger: LogTagger?
+    public let formatter: LogFormatter
     
     /// The ``FileLoggerManager`` instance responsible for all file I/O, rolling, archiving and purging operations.
     let manager: FileLoggerManager
@@ -88,7 +88,7 @@ final class FileLogger: NSObject, ILogger {
     /// - Parameters:
     ///   - message: The ``LogMessage`` instance to be logged.
     ///   - completion: An optional closure called after the write operation completes. It returns `true` if the write was successful.
-    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)? = nil) {
+    public func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)? = nil) {
         manager.write(log: formatter.format(message: message)) { error in
             completion?(error == nil)
         }
@@ -105,7 +105,7 @@ final class FileLogger: NSObject, ILogger {
 ///
 /// All file operations are performed asynchronously on a dispatch queue to ensure thread safety.
 @objcMembers
-final class FileLoggerManager: NSObject, @unchecked Sendable {
+public final class FileLoggerManager: NSObject, @unchecked Sendable {
     
     /// A domain used by this class when throwing `NSError`.
     public static let ErrorDomain = "com.swift.logsmith.FileLoggerManager.ErrorDomain"
@@ -420,7 +420,7 @@ final class FileLoggerManager: NSObject, @unchecked Sendable {
 ///
 /// This class provides a convenient, object-oriented way to access the properties of a log file, such as its URL, name, and file attributes (creation date, size, etc.).
 @objcMembers
-final class LogFile: NSObject, Sendable {
+public final class LogFile: NSObject, Sendable {
     
     /// The full URL of the log file.
     public let url: URL
@@ -470,7 +470,7 @@ final class LogFile: NSObject, Sendable {
 }
 
 /// A protocol that defines a strategy for determining when to roll the active log file.
-@objc protocol RollingFrequency: Sendable {
+@objc public protocol RollingFrequency: Sendable {
     
     /// Determines if the current log file should be rolled based on the implementing strategy's criteria.
     /// - Parameter logFile: The ``LogFile`` instance representing the current active log file.
@@ -480,17 +480,17 @@ final class LogFile: NSObject, Sendable {
 
 /// A ``RollingFrequency`` compliant class that rolls the log file if it's older than a specified time interval.
 @objcMembers
-final class TimeRollingFrequency: NSObject, RollingFrequency {
+public final class TimeRollingFrequency: NSObject, RollingFrequency {
     
     private let rollingInterval: TimeInterval
     
     /// Creates a ``TimeRollingFrequency`` instance based on time rolling strategy.
     /// - Parameter rollingInterval: The maximum age of the log file in seconds. If the file is older than this, it will be rolled.
-    init(rollingInterval: TimeInterval) {
+    public init(rollingInterval: TimeInterval) {
         self.rollingInterval = rollingInterval
     }
     
-    func shouldRoll(logFile: LogFile) -> Bool {
+    public func shouldRoll(logFile: LogFile) -> Bool {
         if let creationTime = logFile.createdAt {
             // Check if the time elapsed since creation is greater than the interval.
             return Date().timeIntervalSince(creationTime) > rollingInterval
@@ -504,31 +504,31 @@ final class TimeRollingFrequency: NSObject, RollingFrequency {
 
 /// A ``RollingFrequency`` compliant class that rolls the log file if it exceeds a specific size.
 @objcMembers
-final class SizeRollingFrequency: NSObject, RollingFrequency {
+public final class SizeRollingFrequency: NSObject, RollingFrequency {
     
     private let maxFileSize: UInt64
     
     /// Creates a ``SizeRollingFrequency`` instance based on size rolling strategy.
     /// - Parameter maxFileSize: The maximum size of the log file (in bytes). If the file's size exceeds this, it will be rolled.
-    init(maxFileSize: UInt64) {
+    public init(maxFileSize: UInt64) {
         self.maxFileSize = maxFileSize
     }
     
-    func shouldRoll(logFile: LogFile) -> Bool {
+    public func shouldRoll(logFile: LogFile) -> Bool {
         return logFile.size > maxFileSize
     }
 }
 
 /// A ``RollingFrequency`` compliant class that rolls the log file at the start of a new application session.
 @objcMembers
-final class SessionRollingFrequency: NSObject, RollingFrequency {
+public final class SessionRollingFrequency: NSObject, RollingFrequency {
     
     /// Creates a ``SessionRollingFrequency`` instance based on app session rolling strategy.
-    override init() {
+    public override init() {
         super.init()
     }
     
-    func shouldRoll(logFile: LogFile) -> Bool {
+    public func shouldRoll(logFile: LogFile) -> Bool {
         if let creationTime = logFile.createdAt {
             // If the file was created before this app session started, roll it.
             return creationTime < LogSmith.sessionLaunchTime

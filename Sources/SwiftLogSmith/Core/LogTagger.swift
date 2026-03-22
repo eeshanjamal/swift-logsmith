@@ -6,14 +6,14 @@
 //  SPDX-License-Identifier: MIT
 //
 
-import Foundation
+public import Foundation
 
 /// A protocol that defines a tag, which adds contextual information to a log message.
 ///
 /// This protocol provides a standardized way to handle tags in your log messages. It helps in providing additional context to your logs (e.g., log type or timestamp).
 ///
 /// It can be tied to specific ``LogType`` logs. It also helps in filtering log data with specific context. For example, logs with ``LogType.error`` or logs within an hour timestamp.
-@objc protocol LogTag: Sendable {
+@objc public protocol LogTag: Sendable {
     
     /// A string to uniquely identify the tag
     var identifier: String {get}
@@ -32,17 +32,17 @@ import Foundation
 ///
 /// This class contains some common log tag identifiers (as static constants) which can be used when creating any ``LogTag`` compliant class instance.
 @objcMembers
-final class LogTagIdentifiers: NSObject, Sendable {
+public final class LogTagIdentifiers: NSObject, Sendable {
     /// Identifier for a timestamp tag.
-    static let date = "date"
+    public static let date = "date"
     /// Identifier for a source file path tag.
-    static let file = "file"
+    public static let file = "file"
     /// Identifier for a source function name tag.
-    static let function = "function"
+    public static let function = "function"
     /// Identifier for a source line number tag.
-    static let line = "line"
+    public static let line = "line"
     /// Identifier for a thread name tag.
-    static let threadName = "threadName"
+    public static let threadName = "threadName"
 }
 
 /// This enum represents the different types of implicit tags an ``InternalTag`` instance can generate.
@@ -66,7 +66,7 @@ final class LogTagIdentifiers: NSObject, Sendable {
     case threadName
     
     /// The string value of the internal tag type.
-    var stringValue: String {
+    public var stringValue: String {
         switch self {
         case .file:
             return LogTagIdentifiers.file
@@ -82,7 +82,7 @@ final class LogTagIdentifiers: NSObject, Sendable {
 
 /// A utility class providing Objective-C compatible access to `InternalTagType` properties.
 @objcMembers
-final class InternalTagTypeUtils: NSObject, Sendable {
+public final class InternalTagTypeUtils: NSObject, Sendable {
     
     /// Returns the string value of an `InternalTagType`.
     /// - Parameter tagType: The `InternalTagType` enum.
@@ -95,7 +95,7 @@ final class InternalTagTypeUtils: NSObject, Sendable {
 /// A protocol for visiting concrete implementations of ``LogTag``.
 ///
 /// This protocol allows to process different `LogTag` implementations (e.g., `InternalTag`, `ExternalTag`) in a type-safe manner without casting.
-@objc protocol LogTagVisitor: Sendable {
+@objc public protocol LogTagVisitor: Sendable {
     
     /// Processes an ``InternalTag``.
     /// - Parameter internalTag: The ``InternalTag`` instance to visit.
@@ -119,12 +119,12 @@ final class InternalTagTypeUtils: NSObject, Sendable {
 /// let userTag = ExternalTag(identifier: LogTagIdentifiers.date, valueProvider: { Date().description })
 /// ```
 @objcMembers
-final class ExternalTag: NSObject, LogTag {
+public final class ExternalTag: NSObject, LogTag {
     
-    let identifier: String
-    let logType: LogType
+    public let identifier: String
+    public let logType: LogType
     /// A string representing the static or dynamic value of the tag.
-    var value: String {
+    public var value: String {
         return valueProvider()
     }
     
@@ -135,7 +135,7 @@ final class ExternalTag: NSObject, LogTag {
     ///   - identifier: The unique identifier for the tag.
     ///   - value: The static string value of the tag.
     ///   - logType: The ``LogType`` this tag should apply to. Defaults to `.undefined` (available to all log types).
-    init(identifier: String, value: String, logType: LogType = .undefined){
+    public init(identifier: String, value: String, logType: LogType = .undefined){
         self.identifier = identifier
         self.logType = logType
         self.valueProvider = { value }
@@ -146,13 +146,13 @@ final class ExternalTag: NSObject, LogTag {
     ///   - identifier: The unique identifier for the tag.
     ///   - valueProvider: A closure that returns the tag's value. This closure is executed each time ``value`` is requested.
     ///   - logType: The ``LogType`` this tag should apply to. Defaults to `.undefined` (which means available to all log types).
-    init(identifier: String, valueProvider: @escaping @Sendable () -> String, logType: LogType = .undefined){
+    public init(identifier: String, valueProvider: @escaping @Sendable () -> String, logType: LogType = .undefined){
         self.identifier = identifier
         self.logType = logType
         self.valueProvider = valueProvider
     }
     
-    func visit(logTagVisitor: any LogTagVisitor) {
+    public func visit(logTagVisitor: any LogTagVisitor) {
         logTagVisitor.visit(externalTag: self)
     }
 }
@@ -162,24 +162,24 @@ final class ExternalTag: NSObject, LogTag {
 /// This type of log tag can be used by the logging system to capture details about the log source call site info (e.g., file, function or  line) and log execution info (e.g., thread name).
 /// These tags are typically generated automatically by the system by providing the intended `InternalLogType`.
 @objcMembers
-final class InternalTag: NSObject, LogTag {
+public final class InternalTag: NSObject, LogTag {
     
-    let identifier: String
-    let logType: LogType
+    public let identifier: String
+    public let logType: LogType
     /// An enum representing the requested tag type for this internal tag.
-    let internalTagType: InternalTagType
+    public let internalTagType: InternalTagType
     
     /// Creates an `InternalTag` instance.
     /// - Parameters:
     ///   - internalTagType: The ``InternalTagType`` this tag represents (e.g., ``.file``, ``.line``).
     ///   - logType: The ``LogType`` this tag should apply to. Defaults to `.undefined` (which means available to all log types).
-    init(internalTagType: InternalTagType, logType: LogType = .undefined) {
+    public init(internalTagType: InternalTagType, logType: LogType = .undefined) {
         self.identifier = internalTagType.stringValue
         self.logType = logType
         self.internalTagType = internalTagType
     }
     
-    func visit(logTagVisitor: any LogTagVisitor) {
+    public func visit(logTagVisitor: any LogTagVisitor) {
         logTagVisitor.visit(internalTag: self)
     }
 }
@@ -211,12 +211,12 @@ final class InternalTag: NSObject, LogTag {
 /// It's a ``LogTaggerOperations`` compliant class providing the necessary tag collection operations.
 /// It ensures that all operations on its instance are internally performed on a serial dispatch queue, making it safe to use from multiple threads.
 @objcMembers
-final class LogTagger: NSObject, LogTaggerOperations {
+public final class LogTagger: NSObject, LogTaggerOperations {
     
     private let logTagCollection: LogTagCollection
     private let queue: DispatchQueue
     
-    override init() {
+    public override init() {
         queue = DispatchQueue(label: "com.swift.logtag.\(NSUUID().uuidString)")
         logTagCollection = LogTagCollection()
         super.init()
@@ -238,7 +238,7 @@ final class LogTagger: NSObject, LogTaggerOperations {
         }
     }
     
-    public func  removeTag(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func removeTag(identifier: String, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
             let result = self.logTagCollection.removeTag(identifier)
             completion?(result)
