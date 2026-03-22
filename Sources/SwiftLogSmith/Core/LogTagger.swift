@@ -16,16 +16,16 @@ public import Foundation
 @objc public protocol LogTag: Sendable {
     
     /// A string to uniquely identify the tag
-    var identifier: String {get}
+    @objc var identifier: String {get}
     
     /// The ``LogType`` this tag is associated with.
     ///
     /// If set to a specific type (e.g., `.error`), the tag will only be applied to logs of that type. If `.undefined`, it applies to all log types.
-    var logType: LogType {get}
+    @objc var logType: LogType {get}
     
     /// This function helps in type-safe processing of the tag.
     /// - Parameter logTagVisitor: The ``LogTagVisitor`` instance that will process this tag.
-    func visit(logTagVisitor: any LogTagVisitor)
+    @objc func visit(logTagVisitor: any LogTagVisitor)
 }
 
 /// Common log tag identifier constants.
@@ -99,11 +99,11 @@ public final class InternalTagTypeUtils: NSObject, Sendable {
     
     /// Processes an ``InternalTag``.
     /// - Parameter internalTag: The ``InternalTag`` instance to visit.
-    func visit(internalTag: InternalTag)
+    @objc func visit(internalTag: InternalTag)
     
     /// Processes an ``ExternalTag``.
     /// - Parameter externalTag: The ``ExternalTag`` instance to visit.
-    func visit(externalTag: ExternalTag)
+    @objc func visit(externalTag: ExternalTag)
 }
 
 /// A concrete implemenation of ``LogTag`` for creating user-defined, dynamic data tags.

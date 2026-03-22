@@ -43,12 +43,12 @@ import Foundation
     /// An optional ``LogTagger`` instance used to append contextual tags automatically to log messages.
     ///
     /// If provided, the logger will use this tagger to inject tags (e.g., User ID, Session ID) out of the box into the final log output.
-    var tagger: LogTagger? { get }
+    @objc var tagger: LogTagger? { get }
     
     /// A ``LogFormatter`` instance that determines the final structure and content of the log message.
     ///
     /// The formatter is responsible for converting a ``LogMessage`` instance into a string representation suitable for output.
-    var formatter: LogFormatter { get }
+    @objc var formatter: LogFormatter { get }
     
     /// Processes and records a log message.
     ///
@@ -56,5 +56,5 @@ import Foundation
     /// - Parameters:
     ///   - message: The ``LogMessage`` instance to be logged.
     ///   - completion: An optional closure that is called after the log has been processed. It returns `true` if logging was successful.
-    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?)
+    @objc func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?)
 }
