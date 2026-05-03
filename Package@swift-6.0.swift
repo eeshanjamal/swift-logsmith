@@ -1,19 +1,12 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.0
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let swiftSettings: Array<SwiftSetting> = [
-    .enableUpcomingFeature("ConciseMagicFile"),
-    .enableUpcomingFeature("BareSlashRegexLiterals"),
-    .enableUpcomingFeature("DeprecateApplicationMain"),
-    .enableUpcomingFeature("DisableOutwardActorInference"),
-    .enableUpcomingFeature("ForwardTrailingClosures"),
-    .enableUpcomingFeature("IsolatedDefaultValues"),
+    .swiftLanguageMode(.v6),
     .enableUpcomingFeature("ExistentialAny"),
-    .enableExperimentalFeature("GlobalConcurrency"),
-    .enableExperimentalFeature("StrictConcurrency"),
-    .enableExperimentalFeature("AccessLevelOnImport"),
+    .enableUpcomingFeature("InternalImportsByDefault"),
 ]
 
 let supportedPlatforms: Array<SupportedPlatform> = [
