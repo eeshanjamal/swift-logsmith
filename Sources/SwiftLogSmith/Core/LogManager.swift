@@ -55,10 +55,10 @@ extension UserDefaults {
 /// A thread-safe class that manages logging operations.
 ///
 /// This class is a central component of logging mainly responsible for:
-/// - Maintaining a collection of active loggers by inheriting ``LogManagerOperations`` protocol.
+/// - Maintaining a collection of active loggers by conforming to `LogManagerOperations`.
 /// - Filtering logs based on global and per-logger minimum ``LogLevel`` and ``LogType``.
 /// - Asynchronously dispatching ``LogMessage`` objects to all relevant loggers.
-/// - Managing a collection of log tags by inheriting ``LogTaggerOperations`` protocol.
+/// - Managing a collection of log tags by conforming to `LogTaggerOperations`.
 /// - Performing all operations on serial dispatch queue to ensure thread safety.
 ///
 /// >Note: Usually, you don't need to interact directly with this class because all its operations are already facilitated by ``LogSmith``.
@@ -80,8 +80,8 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     
     /// Creates a `LogManager` instance.
     ///
-    /// >Note: You can't initialize the log manager instance properties `minLogLevel` & `minLogType` directly from the constructor. So, they defaults to `LogLevel.default` & `LogType.none`.
-    /// Which can be later modified using ``setMinimumLogLevel(logLevel:)`` & ``setMinimumLogType(logType:)``.
+    /// >Note: You can't initialize the log manager instance properties `minimumLogLevel` & `minimumLogType` directly from the constructor. So, when creating a new instance they will be defaults to `LogLevel.default` & `LogType.none`.
+    /// However, they can be later updated using ``setMinimumLogLevel(_:)`` & ``setMinimumLogType(_:)``.
     ///
     /// - Parameters:
     ///   - identifier: A unique string to identify this manager. It helps in storing instance specific properties (e.g., `minLogLevel` or `minLogType`) in persistance storage (such as `UserDefaults`).
