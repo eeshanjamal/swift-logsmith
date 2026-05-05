@@ -1,12 +1,17 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.3
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let swiftSettings: Array<SwiftSetting> = [
     .swiftLanguageMode(.v6),
+    .strictMemorySafety(),
     .enableUpcomingFeature("ExistentialAny"),
     .enableUpcomingFeature("InternalImportsByDefault"),
+    .enableUpcomingFeature("MemberImportVisibility"),
+    .enableUpcomingFeature("InferIsolatedConformances"),
+    .enableUpcomingFeature("NonisolatedNonsendingByDefault"),
+    .enableUpcomingFeature("ImmutableWeakCaptures")
 ]
 
 let supportedPlatforms: Array<SupportedPlatform> = [
@@ -27,8 +32,8 @@ let package = Package(
             targets: ["SwiftLogSmith"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/weichsel/ZIPFoundation.git", exact: "0.9.20"),
-        .package(url: "https://github.com/apple/swift-docc-plugin", exact: "1.3.0")
+        .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.5.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
