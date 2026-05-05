@@ -352,8 +352,7 @@ private final class Utils: Sendable {
             return "main"
         }
         else {
-            let name = __dispatch_queue_get_label(nil)
-            return String(cString: name, encoding: .utf8) ?? Thread.current.name ?? "unknown"
+            return DispatchQueue.currentLabel ?? Thread.current.name ?? "unknown"
         }
     }
     
