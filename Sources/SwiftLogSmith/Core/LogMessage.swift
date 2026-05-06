@@ -40,7 +40,7 @@ public final class Tag: NSObject, Sendable {
 
 /// A data class that encapsulates all the raw information for a single log.
 ///
-/// A `LogMessage` is created automatically by the system (and doesn't required manual creation by the user) which later passed to concrete implementations of Iogger's ``ILogger.log(message:completion:)`` method.
+/// A `LogMessage` is created automatically by the system (and doesn't require manual creation by the user) which later passed to concrete implementations of logger's ``ILogger/log(message:completion:)`` method.
 ///
 /// It serves as a container for a single log raw data (including message, severity, metadata, and all associated tags) before it gets processed by any implementation of ``ILogger``.
 @objcMembers
