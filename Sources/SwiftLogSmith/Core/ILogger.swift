@@ -52,7 +52,7 @@ import Foundation
     
     /// Processes and records a log message.
     ///
-    /// This is the core method where a logger implemetation receives message logging  request. Logger can format it using its ``formatter``, and writes it to a specific destination (e.g., console, file, or a remote server).
+    /// This is the core method where a logger implementation receives message logging  request. Logger can format it using its ``formatter``, and writes it to a specific destination (e.g., console, file, or a remote server).
     /// - Parameters:
     ///   - message: The ``LogMessage`` instance to be logged.
     ///   - completion: An optional closure that is called after the log has been processed. It returns `true` if logging was successful.
