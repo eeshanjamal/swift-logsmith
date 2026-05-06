@@ -10,8 +10,12 @@ import Foundation
 
 extension DispatchQueue {
     static var currentLabel: String? {
-        // We isolate the unsafe calls here
-        let label = unsafe __dispatch_queue_get_label(nil)
-        return unsafe String(cString: label, encoding: .utf8)
+        #if swift(>=6.2)
+            let label = unsafe __dispatch_queue_get_label(nil)
+            return unsafe String(cString: label, encoding: .utf8)
+        #else
+            let label = __dispatch_queue_get_label(nil)
+            return String(cString: label, encoding: .utf8)
+        #endif
     }
 }
