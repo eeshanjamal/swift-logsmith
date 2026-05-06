@@ -192,9 +192,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// This is the most basic logging level. Use it for general application flow messages that don't fit into more specific categories like debugging or error reporting. It's ideal for high-level events that are always relevant regardless of the current debugging state.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func log(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -204,9 +209,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Trace logs are even more detailed than debug logs. They are ideal for high-volume logs that help you follow the exact path of code execution, such as entry/exit points of functions, loop iterations, or state transitions in complex state machines.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logT(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -216,9 +226,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Debug logs provide detailed information that is useful for diagnosing issues. They are typically used to inspect the internal state of the application, variable values, or conditional branch execution. These logs are essential during development but might be too verbose for standard production monitoring.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logD(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -228,9 +243,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Notice logs are for events that are unusual or significant enough to be tracked, but are not errors. Examples include configuration changes, successful security audits, or major state transitions that are part of normal operation but worth noting.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logN(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -240,9 +260,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Info logs highlight the progress of the application at a coarse-grained level. They provide a high-level overview of what the application is doing, such as "Service started", "User logged in", or "Background task completed". These are the standard logs you'd expect to see in a healthy production environment.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logI(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -252,9 +277,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Warning logs indicate that something unexpected happened, but the application is still functioning. It's a "heads-up" that might require investigation to prevent future errors. Examples include using deprecated APIs, low disk space, or retrying a failed network request.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logW(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -264,9 +294,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Error logs are for issues that prevent a specific operation from completing successfully. While the application itself can still run, a user-facing feature might be broken or a background task failed. These logs usually require attention from developers or operations teams.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logE(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -276,9 +311,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Critical logs indicate severe failures that might affect the entire application or system. These represent high-priority issues that often trigger alerts or emergency responses. Examples include primary database failure, loss of core infrastructure connectivity, or security breaches.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logC(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
@@ -288,9 +328,14 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// Fault logs (often equivalent to 'Panic' or 'Fatal') represent the most severe level of error. They are used when the application encounters a state from which it cannot recover, such as data corruption or an impossible logic state. These logs are often the last thing recorded before a crash.
     ///
+    /// > Note: The `fileId`, `function`, and `line` parameters are automatically captured by the compiler using default values (`#fileID`, `#function`, and `#line`). You typically do not need to provide these manually. However, if you are creating a custom wrapper function for this function, you should pass the caller's source information to these parameters to ensure the log correctly identifies the original call site instead of the wrapper.
+    ///
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - fileId: The source file identifier where the log was called.
+    ///   - function: The source function name where the log was called.
+    ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logF(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
