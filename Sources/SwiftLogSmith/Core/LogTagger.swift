@@ -106,7 +106,7 @@ public final class InternalTagTypeUtils: NSObject, Sendable {
     @objc func visit(externalTag: ExternalTag)
 }
 
-/// A concrete implemenation of ``LogTag`` for creating user-defined, dynamic data tags.
+/// A concrete implementation of ``LogTag`` for creating user-defined, dynamic data tags.
 ///
 /// This type of log tag can be used to capture contextual information that is specific to your application's domain. The value of the tag can be provided as a static string or as a dynamic closure (which is evaluated each time the log is processed). This is useful for capturing transient state like the current date, user ID or network status.
 ///
@@ -157,7 +157,7 @@ public final class ExternalTag: NSObject, LogTag {
     }
 }
 
-/// A concrete implemetation of ``LogTag`` for automatically capturing compile-time source & runtime system-level metadata.
+/// A concrete implementation of ``LogTag`` for automatically capturing compile-time source & runtime system-level metadata.
 ///
 /// This type of log tag can be used by the logging system to capture details about the log source call site info (e.g., file, function or  line) and log execution info (e.g., thread name).
 /// These tags are typically generated automatically by the system by providing the intended `InternalLogType`.

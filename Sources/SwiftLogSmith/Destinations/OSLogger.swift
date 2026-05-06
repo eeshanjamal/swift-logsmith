@@ -61,7 +61,7 @@ public final class OSLogger: NSObject, ILogger {
     
     /// Formats the ``LogMessage`` and writes it to the system console using the appropriate `OSLogType`.
     ///
-    /// It first convert the raw ``LogMessage`` into a formatted string. Then logs it by mapping the message's ``LogType`` to the corresponding function
+    /// It first converts the raw ``LogMessage`` into a formatted string. Then logs it by mapping the message's ``LogType`` to the corresponding function
     /// on the underlying `os.Logger` instance (e.g., `logger.notice`, `logger.error`).
     ///
     /// - Parameters:
