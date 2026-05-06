@@ -15,13 +15,13 @@ import ZIPFoundation
 @objc public enum LogFileSortKey: Int, Sendable {
     /// Sort property is not specified.
     case undefined
-    /// Sort by ``LogFile.name`` property.
+    /// Sort by ``LogFile/name`` property.
     case name
-    /// Sort by ``LogFile.createdAt`` property.
+    /// Sort by ``LogFile/createdAt`` property.
     case createdAt
-    /// Sort by ``LogFile.modifiedAt`` property.
+    /// Sort by ``LogFile/modifiedAt`` property.
     case modifiedAt
-    /// Sort by ``LogFile.size`` property.
+    /// Sort by ``LogFile/size`` property.
     case size
 }
 
@@ -425,10 +425,10 @@ public final class LogFile: NSObject, Sendable {
     /// The full URL of the log file.
     public let url: URL
     
-    /// Creates a new `LogFile` instance with provided ``URL``.
+    /// Creates a new `LogFile` instance with provided `URL`.
     ///
     /// - Parameters:
-    ///   - url: The ``URL`` of the file where it's actually stored on disk.
+    ///   - url: The `URL` of the file where it's actually stored on disk.
     public init(url: URL) {
         self.url = url
         super.init()

@@ -12,7 +12,7 @@ public import Foundation
 ///
 /// This protocol provides a standardized way to handle tags in your log messages. It helps in providing additional context to your logs (e.g., log type or timestamp).
 ///
-/// It can be tied to specific ``LogType`` logs. It also helps in filtering log data with specific context. For example, logs with ``LogType.error`` or logs within an hour timestamp.
+/// It can be tied to specific ``LogType`` logs. It also helps in filtering log data with specific context. For example, logs with ``LogType/error`` or logs within an hour timestamp.
 @objc public protocol LogTag: Sendable {
     
     /// A string to uniquely identify the tag
@@ -171,7 +171,7 @@ public final class InternalTag: NSObject, LogTag {
     
     /// Creates an `InternalTag` instance.
     /// - Parameters:
-    ///   - internalTagType: The ``InternalTagType`` this tag represents (e.g., ``.file``, ``.line``).
+    ///   - internalTagType: The ``InternalTagType`` this tag represents (e.g., ``InternalTagType/file``, ``InternalTagType/line``).
     ///   - logType: The ``LogType`` this tag should apply to. Defaults to `.undefined` (which means available to all log types).
     public init(internalTagType: InternalTagType, logType: LogType = .undefined) {
         self.identifier = internalTagType.stringValue
@@ -208,7 +208,7 @@ public final class InternalTag: NSObject, LogTag {
 
 /// A manager to manage a collection of ``LogTag`` instances in a thread-safe manner.
 ///
-/// It's a ``LogTaggerOperations`` compliant class providing the necessary tag collection operations.
+/// It's a `LogTaggerOperations` conforming class providing the necessary tag collection operations.
 /// It ensures that all operations on its instance are internally performed on a serial dispatch queue, making it safe to use from multiple threads.
 @objcMembers
 public final class LogTagger: NSObject, LogTaggerOperations {

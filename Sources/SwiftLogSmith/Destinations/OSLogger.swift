@@ -11,7 +11,7 @@ import OSLog
 
 /// An ``ILogger`` compliant class that writes to the Apple Unified Logging System (`os.Logger`).
 ///
-/// `OSLogger` directs log messages to the system console, making them viewable in Xcode's debug area and the `Console.app`. This logger is highly efficient and is the standard for system-level logging on Apple platforms. It automatically maps the library's ``LogType`` to the corresponding `OSLogType` (e.g., ``LogType.error`` maps to `OSLogType.error`).
+/// `OSLogger` directs log messages to the system console, making them viewable in Xcode's debug area and the `Console.app`. This logger is highly efficient and is the standard for system-level logging on Apple platforms. It automatically maps the library's ``LogType`` to the corresponding `OSLogType` (e.g., ``LogType/error`` maps to `OSLogType.error`).
 ///
 /// **Default Behavior**
 ///
@@ -38,7 +38,7 @@ public final class OSLogger: NSObject, ILogger {
     /// Creates a new `OSLogger` instance with the default subsystem and category.
     ///
     /// - Parameters:
-    ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to ``LogFormatter.default``.
+    ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to ``LogFormatter/default``.
     ///   - logTagger: An optional ``LogTagger`` to automatically add tags to the logs of this specific logger.
     public init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
         logger = Logger()
@@ -51,7 +51,7 @@ public final class OSLogger: NSObject, ILogger {
     /// - Parameters:
     ///   - subsystem: An identifier for your app or a major module (e.g., "com.example.myapp").
     ///   - category: A specific functional area within the subsystem (e.g., "Authentication", "UI").
-    ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to ``LogFormatter.default``.
+    ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to ``LogFormatter/default``.
     ///   - logTagger: An optional ``LogTagger`` to automatically add tags to the logs of this specific logger.
     public init(subsystem: String, category: String, logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
         logger = Logger(subsystem: subsystem, category: category)
