@@ -2,8 +2,8 @@
 
 A lightweight, flexible, and thread-safe logging library for Swift, designed to make logging effortless yet powerful. Built with support for **Swift 6 Concurrency**.
 
-[![Swift 5.10](https://img.shields.io/badge/Swift-5.10%20%7C%206.0-orange.svg)](https://swift.org)
-[![Platforms](https://img.shields.io/badge/Platforms-iOS%20%7C%20macOS%20%7C%20tvOS%20%7C%20watchOS%20%7C%20visionOS-lightgrey.svg)](https://developer.apple.com)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Feeshanjamal%2Fswift-logsmith%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/eeshanjamal/swift-logsmith)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2Feeshanjamal%2Fswift-logsmith%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/eeshanjamal/swift-logsmith)
 [![Coverage](https://img.shields.io/badge/Coverage-100%25-brightgreen)](https://github.com/eeshanjamal/swift-logsmith)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
