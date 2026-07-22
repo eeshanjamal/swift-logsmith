@@ -38,7 +38,7 @@ public final class OSLogger: NSObject, ILogger {
     /// Creates a new `OSLogger` instance with the default subsystem and category.
     ///
     /// - Parameters:
-    ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to ``LogFormatter/default``.
+    ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to LogFormatter's ``LogFormatter/default`` format.
     ///   - logTagger: An optional ``LogTagger`` to automatically add tags to the logs of this specific logger.
     public init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil) {
         logger = Logger()
