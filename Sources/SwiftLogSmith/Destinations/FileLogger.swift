@@ -78,7 +78,7 @@ public final class FileLogger: NSObject, ILogger {
     ///   - logFormatter: The ``LogFormatter`` to use for structuring the log message. Defaults to ``LogFormatter.default``.
     ///   - logTagger: An optional ``LogTagger`` to automatically add tags to the logs of this specific logger.
     ///   - fileLoggerManager: The ``FileLoggerManager`` that will handle the underlying file I/O operations. Defaults to a new manager with standard settings.
-    init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil, fileLoggerManager: FileLoggerManager = try! FileLoggerManager()) {
+    public init(logFormatter: LogFormatter = LogFormatter.default, logTagger: LogTagger? = nil, fileLoggerManager: FileLoggerManager = try! FileLoggerManager()) {
         formatter = logFormatter
         tagger = logTagger
         manager = fileLoggerManager
