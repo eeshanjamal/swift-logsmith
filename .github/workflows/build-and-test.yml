@@ -1,0 +1,32 @@
+name: Build & Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.runner }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-15's default Xcode (16.4) carries Swift 6.0.x, exercising Package@swift-6.0.swift.
+        # macos-26's default Xcode (26.5) carries Swift 6.3, exercising the default Package.swift.
+        runner: [macos-15, macos-26]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show environment
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
