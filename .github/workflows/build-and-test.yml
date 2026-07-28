@@ -17,7 +17,8 @@ jobs:
         # macos-26's default Xcode (26.5) carries Swift 6.3, exercising the default Package.swift.
         runner: [macos-15, macos-26]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v6
 
       - name: Show environment
         run: |
