@@ -75,7 +75,6 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     private var loggerItems: [LoggerItem]
     private let logTagger = LogTagger()
     private let queue = DispatchQueue(label: "com.swift.logsmith.logman.\(NSUUID().uuidString)")
-    private let logCompletionQueue = DispatchQueue(label: "com.swift.logsmith.logman.completion.\(NSUUID().uuidString)")
     private var minLogLevel = LogLevel.default
     private var minLogType = LogType.none
     
@@ -195,7 +194,7 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
         queue.async {
             // Check Manager Level
             guard logType.logLevel.rawValue >= self.getMinimumLogLevel().rawValue && logType.rawValue >= self.getMinimumLogType().rawValue else {
-                self.logCompletionQueue.async { completion?(true) }
+                completion?(true)
                 return
             }
             
@@ -218,9 +217,8 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
                         }
                     }
                 }
-
-                self.logCompletionQueue.async {
-                    group.wait()
+                
+                group.notify(queue: self.queue) {
                     completion?(tracker.allSuccess)
                 }
             }
