@@ -13,18 +13,34 @@ import Foundation
 private final class LogSmithMockLogger: ILogger, @unchecked Sendable {
     var tagger: LogTagger? = nil
     var formatter: LogFormatter = LogFormatter.default
-    var lastLogMessage: LogMessage?
-    var logCallCount = 0
-    
+    private let lock = NSLock()
+    private var logMessages: [LogMessage] = []
+
+    var logCallCount: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return logMessages.count
+    }
+
+    /// Returns the last recorded message, or — if `logType` is provided — the last recorded message with that `logType`.
+    func lastLogMessage(for logType: LogType? = nil) -> LogMessage? {
+        lock.lock()
+        defer { lock.unlock() }
+        guard let logType else { return logMessages.last }
+        return logMessages.last(where: { $0.logType == logType })
+    }
+
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
-        lastLogMessage = message
-        logCallCount += 1
+        lock.lock()
+        logMessages.append(message)
+        lock.unlock()
         completion?(true)
     }
-    
+
     func reset() {
-        lastLogMessage = nil
-        logCallCount = 0
+        lock.lock()
+        defer { lock.unlock() }
+        logMessages.removeAll()
     }
 }
 
@@ -87,11 +103,11 @@ final class LogSmithTests: XCTestCase {
                 let type = item.type
                 item.call { result in
                     XCTAssertTrue(result)
-                    XCTAssertEqual(logger.lastLogMessage?.logType, type)
-                    
+                    XCTAssertNotNil(logger.lastLogMessage(for: type))
+
                     // Specific metadata check for critical log
                     if type == .critical {
-                        XCTAssertEqual(logger.lastLogMessage?.metadata, criticalMetadata)
+                        XCTAssertEqual(logger.lastLogMessage(for: type)?.metadata, criticalMetadata)
                     }
                     
                     fulfill()
@@ -121,7 +137,7 @@ final class LogSmithTests: XCTestCase {
         
         expectCompletion(description: "Verify tag presence") { fulfill in
             LogSmith.logI("Tag test") { _ in
-                XCTAssertTrue(logger.lastLogMessage?.tags.contains(where: { $0.identifier == "TestStaticTag" }) ?? false)
+                XCTAssertTrue(logger.lastLogMessage()?.tags.contains(where: { $0.identifier == "TestStaticTag" }) ?? false)
                 fulfill()
             }
         }
@@ -129,7 +145,7 @@ final class LogSmithTests: XCTestCase {
         LogSmith.removeTag(tag)
         expectCompletion(description: "Verify tag removal") { fulfill in
             LogSmith.logI("Tag test 2") { _ in
-                XCTAssertFalse(logger.lastLogMessage?.tags.contains(where: { $0.identifier == "TestStaticTag" }) ?? false)
+                XCTAssertFalse(logger.lastLogMessage()?.tags.contains(where: { $0.identifier == "TestStaticTag" }) ?? false)
                 fulfill()
             }
         }
@@ -148,8 +164,8 @@ final class LogSmithTests: XCTestCase {
                 // We use a specific log call for each type to ensure the correct symbolic tag is triggered.
                 // Note: Manager filters tags by logType, so logI will only include the "info" symbolic tag.
                 sharedLogCall(type: type) { _ in
-                    XCTAssertTrue(logger.lastLogMessage?.tags.contains(where: { 
-                        $0.identifier == type.stringValue && $0.value == type.symbolicValue 
+                    XCTAssertTrue(logger.lastLogMessage(for: type)?.tags.contains(where: {
+                        $0.identifier == type.stringValue && $0.value == type.symbolicValue
                     }) ?? false, "Symbolic tag for \(type) missing or incorrect")
                     fulfill()
                 }
