@@ -38,6 +38,33 @@ public final class Tag: NSObject, Sendable {
     }
 }
 
+/// A marker protocol for attaching arbitrary structured context to a ``LogMessage``.
+///
+/// ``LogMessage/metadata`` is a flat `[String: String]` dictionary, which is enough for most logs but
+/// cannot represent richer, nested or strongly-typed context. `LogPayload` provides an escape hatch:
+/// an integration can define its own payload type, hand it to ``LogManager/log(message:logType:metadata:payload:fileId:function:line:completion:)``,
+/// and any ``ILogger`` can recover it with a conditional cast.
+///
+/// The protocol itself has no requirements — it exists purely so the payload can travel through the
+/// logging pipeline without the core library needing to know its concrete type.
+///
+/// **Usage:**
+/// ```swift
+/// public final class RequestPayload: NSObject, LogPayload {
+///     public let requestId: UUID
+///     public init(requestId: UUID) { self.requestId = requestId }
+/// }
+///
+/// // Inside a custom ILogger:
+/// if let payload = message.payload as? RequestPayload {
+///     print(payload.requestId)
+/// }
+/// ```
+///
+/// > Note: Conforming types must be `Sendable`, since a ``LogMessage`` may be delivered to loggers on
+/// a different thread than the one that created it.
+@objc public protocol LogPayload: Sendable {}
+
 /// A data class that encapsulates all the raw information for a single log.
 ///
 /// A `LogMessage` is created automatically by the system (and doesn't require manual creation by the user) which later passed to concrete implementations of logger's ``ILogger/log(message:completion:)`` method.
@@ -45,7 +72,7 @@ public final class Tag: NSObject, Sendable {
 /// It serves as a container for a single log raw data (including message, severity, metadata, and all associated tags) before it gets processed by any implementation of ``ILogger``.
 @objcMembers
 public final class LogMessage: NSObject, Sendable {
-    
+
     /// The raw (or non-formatted) log message string.
     public let message: String
     /// The severity type of the log.
@@ -54,12 +81,17 @@ public final class LogMessage: NSObject, Sendable {
     public let tags: [Tag]
     /// A dictionary of additional data associated with the log.
     public let metadata: [String: String]
-    
-    internal init(message: String, logType: LogType, tags: [Tag], metadata: [String: String]) {
+    /// Optional structured context attached by an integration, or `nil` for ordinary logs.
+    ///
+    /// Recover the concrete type with a conditional cast. See ``LogPayload``.
+    public let payload: (any LogPayload)?
+
+    internal init(message: String, logType: LogType, tags: [Tag], metadata: [String: String], payload: (any LogPayload)? = nil) {
         self.message = message
         self.logType = logType
         self.tags = tags
         self.metadata = metadata
+        self.payload = payload
     }
 }
 
