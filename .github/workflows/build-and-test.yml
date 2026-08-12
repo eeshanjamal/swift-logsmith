@@ -30,4 +30,25 @@ jobs:
         run: swift build
 
       - name: Test
-        run: swift test
+        run: swift test --enable-code-coverage
+
+      # Coverage is identical across toolchains, so it's only reported from one leg
+      # to avoid double-posting the same result to Coveralls.
+      - name: Export coverage
+        if: matrix.runner == 'macos-26'
+        run: |
+          BIN_PATH="$(swift build --show-bin-path)"
+          XCTEST_PATH="$(find "${BIN_PATH}" -name '*.xctest' | head -1)"
+          # Paths are rewritten relative to the repo root so Coveralls can map them to source files.
+          xcrun llvm-cov export -format=lcov \
+            "${XCTEST_PATH}/Contents/MacOS/$(basename "${XCTEST_PATH}" .xctest)" \
+            -instr-profile "${BIN_PATH}/codecov/default.profdata" \
+            -ignore-filename-regex=".build|Tests" \
+            | sed "s|SF:${PWD}/|SF:|" > coverage.lcov
+
+      - name: Upload coverage to Coveralls
+        if: matrix.runner == 'macos-26'
+        uses: coverallsapp/github-action@v2
+        with:
+          file: coverage.lcov
+          format: lcov
