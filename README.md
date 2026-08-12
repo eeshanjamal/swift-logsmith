@@ -21,6 +21,7 @@ A lightweight, flexible, and thread-safe logging library for Swift, designed to 
 - **🎨 Custom Formatting:** Design your own log format using the powerful `LogFormatter` builder pattern.
 - **🔒 Thread Safe:** All operations are thread-safe, following modern Swift 6 concurrency principles.
 - **🔌 Obj-C Support:** Designed to be easily used in Swift and Objective-C interoperable projects.
+- **🌉 swift-log Backend:** Opt into `SwiftLogSmithBackend` to capture logs from any package using [apple/swift-log](https://github.com/apple/swift-log), including your third-party dependencies.
 
 ## Installation
 
@@ -41,6 +42,27 @@ dependencies: [
     .package(url: "https://github.com/eeshanjamal/swift-logsmith.git", from: "1.0.0")
 ]
 ```
+
+Then add the product to your target:
+
+```swift
+.target(
+    name: "MyApp",
+    dependencies: [
+        .product(name: "SwiftLogSmith", package: "swift-logsmith")
+    ])
+```
+
+The package also vends an optional `SwiftLogSmithBackend` product, which makes SwiftLogSmith a backend for
+[apple/swift-log](https://github.com/apple/swift-log). Add it alongside `SwiftLogSmith` only if you need it —
+the core library has no `swift-log` dependency.
+
+```swift
+.product(name: "SwiftLogSmithBackend", package: "swift-logsmith")
+```
+
+> **Note:** `SwiftLogSmithBackend` requires **Swift 6.2+**, because `swift-log` 1.11.0 and later declare
+> `swift-tools-version:6.2`. The core `SwiftLogSmith` library continues to support Swift 6.0.
 
 ## Quick Start
 
@@ -121,6 +143,61 @@ LogSmith.log("Network status is stable")
 // [Production] 📢 Network status is stable
 ```
 
+### 4. Using SwiftLogSmith as a swift-log Backend
+
+Add the `SwiftLogSmithBackend` product and bootstrap once at launch. Every `Logger(label:)` in the process —
+**including loggers inside the packages you depend on** — is then delivered to your registered loggers,
+honouring the same filters, tags and formatters as first-party `LogSmith` calls.
+
+```swift
+import Logging
+import SwiftLogSmith
+import SwiftLogSmithBackend
+
+// 1. Bootstrap once, as early as possible
+LoggingSystem.bootstrapWithLogSmith()
+
+// 2. Configure SwiftLogSmith as usual
+LogSmith.addLogger(newLogger: FileLogger())
+
+// 3. Any swift-log logger now flows into SwiftLogSmith
+let logger = Logger(label: "com.demo.net")
+logger.error("Request failed", metadata: ["user": ["id": "7"], "code": "404"])
+
+// Expected Output (via OSLogger and FileLogger):
+// [E] Request failed ["label": "com.demo.net", "source": "MyApp", "code": "404", "user": "[\"id\": \"7\"]"]
+```
+
+`swift-log` metadata is a tree, while `LogMessage.metadata` is a flat `[String: String]`. Both are populated:
+a readable rendering lands in `metadata` so the default formatter shows it immediately, and the untouched
+original travels in a `SwiftLogPayload`:
+
+```swift
+final class MyLogger: ILogger {
+    func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
+        if let payload = message.payload as? SwiftLogPayload {
+            print(payload.label)                       // "com.demo.net"
+            print(payload.resolvedMetadata ?? [:])     // nested structure preserved
+        }
+        completion?(true)
+    }
+    // ...
+}
+```
+
+To keep `swift-log` traffic on a separate pipeline, bootstrap against your own `LogManager` instead:
+
+```swift
+let manager = LogManager(identifier: "swift-log", defaultLogger: OSLogger())
+LoggingSystem.bootstrapWithLogSmith(manager: manager)
+```
+
+> **Filtering:** `swift-log` performs its own level check before calling the backend, so the effective
+> threshold is the stricter of the two systems. Prefer filtering with `logger.logLevel` or
+> `bootstrapWithLogSmith(defaultLogLevel:)` and leave `LogSmith.setMinimumLogType(_:)` at its default —
+> `LogType` orders `notice` < `info` < `debug` < `trace`, which is the reverse of `swift-log`'s ordering,
+> so `setMinimumLogType(.info)` would discard `swift-log` `.notice` messages.
+
 ## Architecture
 
 SwiftLogSmith follows a modular design to separate data gathering, formatting, and output.
@@ -128,6 +205,8 @@ SwiftLogSmith follows a modular design to separate data gathering, formatting, a
 ```mermaid
 graph TD
     User([User Call]) --> LogSmith[LogSmith]
+    SwiftLog([swift-log Logger]) -.optional.-> Handler[LogSmithLogHandler]
+    Handler --> LogSmith
     LogSmith --> LogManager[LogManager]
 
     LogManager --> Construct{Construct LogMessages}

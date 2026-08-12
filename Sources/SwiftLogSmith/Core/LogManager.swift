@@ -182,52 +182,58 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     /// - Extract (logger-specific) tags for each active logger's ``LogTagger``.
     /// - Construct a new ``LogMessage`` for each logger with all provided & extracted info and dispatches to it.
     ///
+    /// > Note: `fileId` and `function` are plain `String` values rather than `StaticString`. They are still captured
+    /// automatically by the compiler via `#fileID`/`#function`, so ordinary call sites need not provide them. Using
+    /// `String` additionally lets callers that receive source information at runtime — such as a logging facade
+    /// bridging into this manager — forward the original call site, which a `StaticString` cannot represent.
+    ///
     /// - Parameters:
     ///   - message: The raw message string.
     ///   - logType: The severity type of the log.
     ///   - metadata: An optional dictionary to provide additional info for this log.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file where the log was called.
     ///   - function: The source function where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: A closure that is called after all relevant loggers have processed the message. Returns `true` if all loggers succeeded.
-    public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+    public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
         queue.async {
             // Check Manager Level
             guard logType.logLevel.rawValue >= self.getMinimumLogLevel().rawValue && logType.rawValue >= self.getMinimumLogType().rawValue else {
                 completion?(true)
                 return
             }
-            
+
             self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerTags in
-                
+
                 // Identify which loggers accept this log level
                 let activeItems = self.loggerItems.filter { loggerItem in
                     logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue
                 }
-                
+
                 let group = DispatchGroup()
                 let tracker = ResultTracker()
-                
+
                 activeItems.forEach { loggerItem in
                     group.enter()
                     self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
-                        loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata)) { success in
+                        loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata, payload: payload)) { success in
                             tracker.record(success)
                             group.leave()
                         }
                     }
                 }
-                
+
                 group.notify(queue: self.queue) {
                     completion?(tracker.allSuccess)
                 }
             }
         }
     }
-    
+
     //MARK: Private operation API's
-    
-    private func extractTags(logTagger: LogTagger?, logType: LogType, fileId: StaticString, function: StaticString, line: UInt, completion: @escaping (@Sendable([Tag]) -> Void)) {
+
+    private func extractTags(logTagger: LogTagger?, logType: LogType, fileId: String, function: String, line: UInt, completion: @escaping (@Sendable([Tag]) -> Void)) {
         if let logTagger = logTagger {
             logTagger.logTags(logType: logType) { logTags in
                 completion(LogTagsExtractor().extract(logTags: logTags, fileId: fileId, function: function, line: line))
@@ -312,9 +318,9 @@ private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
     ///   - function: The source function, used for any ``InternalTag`` of type `.function`.
     ///   - line: The source line, used for any ``InternalTag`` of type `.line`.
     /// - Returns: An array of concrete ``Tag`` objects.
-    func extract(logTags: [any LogTag], fileId: StaticString, function: StaticString, line: UInt) -> [Tag] {
-        self.fileId = "\(fileId)"
-        self.function = "\(function)"
+    func extract(logTags: [any LogTag], fileId: String, function: String, line: UInt) -> [Tag] {
+        self.fileId = fileId
+        self.function = function
         self.line = Int(line)
         tags.removeAll()
         logTags.forEach { logTag in

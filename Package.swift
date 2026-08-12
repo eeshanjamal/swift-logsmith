@@ -30,10 +30,16 @@ let package = Package(
         .library(
             name: "SwiftLogSmith",
             targets: ["SwiftLogSmith"]),
+        // Opt-in swift-log backend. Requires Swift 6.2+, so it is absent from the
+        // Package@swift-6.0.swift and Package@swift-6.1.swift manifests.
+        .library(
+            name: "SwiftLogSmithBackend",
+            targets: ["SwiftLogSmithBackend"]),
     ],
     dependencies: [
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.5.0")
+        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.5.0"),
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.11.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
@@ -44,9 +50,20 @@ let package = Package(
                 .product(name: "ZIPFoundation", package: "ZIPFoundation")
             ],
             swiftSettings: swiftSettings),
+        .target(
+            name: "SwiftLogSmithBackend",
+            dependencies: [
+                "SwiftLogSmith",
+                .product(name: "Logging", package: "swift-log")
+            ],
+            swiftSettings: swiftSettings),
         .testTarget(
             name: "SwiftLogSmithTests",
             dependencies: ["SwiftLogSmith"]
+        ),
+        .testTarget(
+            name: "SwiftLogSmithBackendTests",
+            dependencies: ["SwiftLogSmithBackend"]
         ),
     ]
 )
