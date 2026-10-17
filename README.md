@@ -39,7 +39,7 @@ Add `SwiftLogSmith` to your `Package.swift` file:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/eeshanjamal/swift-logsmith.git", from: "1.0.0")
+    .package(url: "https://github.com/eeshanjamal/swift-logsmith.git", from: "2.0.0")
 ]
 ```
 

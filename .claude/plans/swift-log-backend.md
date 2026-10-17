@@ -105,13 +105,14 @@ defaults. Not fixing the ordering itself — that would be a breaking change.
 
 ## Implementation checklist
 
-### Core (`Sources/SwiftLogSmith/`) — additive, non-breaking
+### Core (`Sources/SwiftLogSmith/`) — additive, except `LogManager.log` (see "Found during pre-merge testing")
 
 - [x] `Core/LogMessage.swift`: add `@objc public protocol LogPayload: Sendable {}`
 - [x] `Core/LogMessage.swift`: add `public let payload: (any LogPayload)?`, extend internal init
 - [x] `Core/LogManager.swift`: replace `fileId`/`function` with `String`, add `payload:` param
 - [x] `Core/LogManager.swift`: refactor `extractTags` / `LogTagsExtractor.extract` to `String`
-- [x] `LogSmith.swift`: keep `StaticString` on all nine `log*` statics
+- [x] `LogSmith.swift`: ~~keep `StaticString` on all nine `log*` statics~~ — superseded: all nine now take `String`
+      (see "Found during pre-merge testing")
 - [x] `LogSmith.swift`: add one forwarding static with `payload` + `String` source location
 - [x] Confirm `LogMessage` still has **checked** `Sendable` (no `@unchecked` crept in)
 
@@ -161,8 +162,9 @@ Local toolchain at time of writing: Swift 6.3.2 / Xcode 26.5.
 
 - [x] `swift build` — new target compiles under `.swiftLanguageMode(.v6)`, `.strictMemorySafety()`,
       `ExistentialAny`
-- [x] `swift test` — the existing 39 tests pass **unchanged** (the evidence that core changes were
-      additive)
+- [x] `swift test` — the existing 39 tests pass **unchanged** (necessary, but weaker evidence of
+      additivity than it looks: none of them passes an explicit `StaticString`, so they cannot see the
+      `LogManager.log` break — see "Found during pre-merge testing")
 - [x] The documented wrapper pattern still compiles:
       ```swift
       func myLog(_ m: String, fileId: StaticString = #fileID,
@@ -209,8 +211,8 @@ With only one `log` method there is nothing to disambiguate, and `#fileID`/`#fun
 `String` defaults just as well as `StaticString` ones. Dropping the defaults would have broken
 ~20 existing `LogManagerTests` call sites and every direct `LogManager` user, for no benefit.
 
-Kept the defaults. Result: **all 39 existing tests pass with no test-file changes at all**, which
-is stronger evidence of additivity than the plan anticipated.
+Kept the defaults. Result: all 39 existing tests pass with no test-file changes at all. (That is weaker
+evidence of additivity than it first looked; see "Found during pre-merge testing".)
 
 ### Symbolic `[E]`/`[I]` tags only appear on the shared pipeline
 
@@ -227,6 +229,71 @@ manager, `SharedPipelineConcurrencyTests` asserts it is *present* on the shared 
 The first version of the suite polled `logCallCount` from a background queue. Those loops outlived
 their tests and crashed in `tearDown` once the spy was nilled. `BackendMockLogger.setOnLog(_:)` now
 drives `XCTestExpectation` directly, which also removed the non-Sendable `self`-capture warnings.
+
+---
+
+## Found during pre-merge testing
+
+Written after the checklists above were ticked; where they disagree, this section wins.
+
+### `fileId`/`function` are `String` everywhere — a source-breaking change
+
+`fileId` and `function` now take `String` on `LogManager.log` and on all nine `LogSmith.log*` statics (they were
+`StaticString`), and `LogManager.log` gained `payload:`. `swift package diagnose-api-breaking-changes v1.1.0
+--products SwiftLogSmith` reports 19 changes: the removed `LogManager.log` signature plus 2 parameter-type changes
+on each of the nine statics.
+
+Defaults, `#fileID`/`#function` literals and string literals keep compiling, so most callers cannot tell. What breaks
+is forwarding a `StaticString`: the documentation for every static says a wrapper author *should* pass the caller's
+source information to these parameters, and a wrapper that does so with `StaticString` parameters no longer
+compiles. The fix is to declare the wrapper's own parameters as `String` (callers of the wrapper are unaffected);
+that migration line goes in the release notes. The existing tests could not see the break: none passes an explicit
+`fileId`.
+
+Why `String` everywhere rather than two overloads (measured, release build, filtered path): no performance
+advantage is left — caller-side enqueue cost is identical (360 vs 363 ns), and end to end all-`String` is within
+~2% of 1.1.0 while the previous mixed design (`StaticString` statics converting before the filter) was +34%. The
+literal-only guarantee protects nothing here (`message` is already a `String`; the formatter escapes none of
+`message`, `fileId` or `function`). A `StaticString`/`String` overload pair is ambiguous unless the `String`
+overload has no defaults, and even then explicit literals silently pick `String`. One type removes the glue, matches
+swift-log, and makes the statics callable from Objective-C.
+
+**Versioning — decision: ship as 2.0.0.** A documented use (a wrapper forwarding `StaticString`) stops compiling,
+which SemVer treats as an incompatible change. The library has few consumers (3 stars, 0 forks, no public
+dependents found on GitHub), so a major bump costs almost nothing: `from: "1.x"` consumers stay on 1.1.0 until they
+opt in with `from: "2.0.0"`, instead of hitting a compile error on a routine update. The README install snippet
+already says `from: "2.0.0"`.
+
+CI diffs against the latest release tag and ignores only what is listed in `.github/api-breakage-allowlist.txt`
+(the file is parsed verbatim, so it cannot hold comments). Once `v2.0.0` is tagged it becomes the baseline and the
+entries can be deleted.
+
+**Objective-C:** none of `LogManager.log`, `LogSmith.log*` was visible to Objective-C in 1.1.0 — `StaticString` is
+not representable and `@objcMembers` omits such members silently — so no Objective-C caller can be broken. They are
+now visible (`+[LogSmith logE:metadata:fileId:function:line:completion:]` and so on); Objective-C has no default
+arguments, so callers pass file, function and line explicitly.
+
+### swift-log lower bound is 1.12.0, not 1.11.0
+
+The handler reads `LogEvent.error`, which first shipped in swift-log 1.12.0; the backend does not compile against
+1.11.0. `Package.resolved` pins 1.15.0, which hid this. Both manifests now say `from: "1.12.0"`, and a CI job
+builds and tests at whatever lower bound `Package.swift` declares.
+
+### Handler-level metadata was dropped on statements with no metadata of their own
+
+`resolveMetadata` returned `nil` when a statement carried nothing beyond the handler's baseline, and
+`log(event:)` flattened `nil` to `[:]`, so `logger[metadataKey: "request-id"] = ...` followed by a plain
+`logger.info(...)` delivered no `request-id`. swift-log's `StreamLogHandler` has the same fast path but falls
+back to its stored baseline. `resolveMetadata` no longer returns an optional: it always returns the merged
+metadata (the baseline when the statement adds nothing, empty when there is none), and
+`SwiftLogPayload.resolvedMetadata` is non-optional to match.
+
+### CI covered two of the four manifests
+
+macos-15's Xcode 16.4 is Swift 6.1.2, so the job selected `Package@swift-6.1.swift`, not the 6.0 manifest its
+comment claimed; macos-26 selected `Package.swift`. `Package@swift-6.2.swift` — the manifest every Swift 6.2
+consumer of the backend gets — was never built. CI now has a Swift 6.2 leg (Xcode pinned, toolchain asserted).
+`Package@swift-6.0.swift` is deliberately left unexercised.
 
 ---
 
