@@ -22,8 +22,8 @@ public import SwiftLogSmith
 /// ```swift
 /// func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
 ///     if let payload = message.payload as? SwiftLogPayload {
-///         print(payload.label)                  // "com.example.network"
-///         print(payload.resolvedMetadata ?? [:]) // nested structure preserved
+///         print(payload.label)            // "com.example.network"
+///         print(payload.resolvedMetadata) // nested structure preserved
 ///     }
 ///     completion?(true)
 /// }
@@ -45,16 +45,16 @@ public final class SwiftLogPayload: NSObject, LogPayload {
     /// full source location.
     public let event: LogEvent
 
-    /// The effective metadata after merging, or `nil` when the log carried no per-statement metadata.
+    /// The effective metadata after merging; empty when the handler had none and the statement carried none.
     ///
     /// Merge precedence follows `swift-log`'s own convention: the handler's base metadata is overridden by
     /// the `Logger.MetadataProvider`, which is in turn overridden by the metadata passed at the call site.
     /// Any associated error contributes `error.message` and `error.type` entries.
     ///
     /// This differs from ``event`` — `event.metadata` holds only what was supplied at the call site.
-    public let resolvedMetadata: Logger.Metadata?
+    public let resolvedMetadata: Logger.Metadata
 
-    internal init(label: String, event: LogEvent, resolvedMetadata: Logger.Metadata?) {
+    internal init(label: String, event: LogEvent, resolvedMetadata: Logger.Metadata) {
         self.label = label
         self.source = event.source
         self.event = event

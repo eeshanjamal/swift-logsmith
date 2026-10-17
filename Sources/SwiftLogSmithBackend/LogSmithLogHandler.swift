@@ -190,19 +190,14 @@ public struct LogSmithLogHandler: LogHandler {
     /// Merges the three metadata sources following `swift-log`'s documented precedence.
     ///
     /// Base metadata is overridden by the provider, which is overridden by call-site metadata. An associated
-    /// error contributes `error.message` and `error.type`. Returns `nil` when the statement carried nothing
-    /// beyond the handler's baseline, matching the behaviour of `swift-log`'s own `StreamLogHandler`.
+    /// error contributes `error.message` and `error.type`. A statement that adds nothing of its own gets the
+    /// handler's base metadata back unchanged, which is empty when the handler has none.
     internal static func resolveMetadata(base: Logger.Metadata,
                                          provider: Logger.MetadataProvider?,
                                          explicit: Logger.Metadata?,
-                                         error: (any Error)?) -> Logger.Metadata? {
+                                         error: (any Error)?) -> Logger.Metadata {
         var metadata = base
         let provided = provider?.get() ?? [:]
-
-        guard !provided.isEmpty || !(explicit ?? [:]).isEmpty || error != nil else {
-            // Nothing beyond the baseline was supplied for this statement.
-            return nil
-        }
 
         if !provided.isEmpty {
             metadata.merge(provided, uniquingKeysWith: { _, provided in provided })
@@ -225,8 +220,7 @@ public struct LogSmithLogHandler: LogHandler {
     /// Nested dictionaries and arrays are rendered through `Logger.MetadataValue`'s own `description`, so a
     /// value of `.dictionary(["id": "7"])` becomes the string `["id": "7"]`. They remain readable but stop
     /// being traversable; the untouched original is preserved on ``SwiftLogPayload/resolvedMetadata``.
-    internal static func flatten(_ metadata: Logger.Metadata?) -> [String: String] {
-        guard let metadata else { return [:] }
+    internal static func flatten(_ metadata: Logger.Metadata) -> [String: String] {
         return metadata.mapValues { $0.description }
     }
 }

@@ -177,7 +177,7 @@ final class MyLogger: ILogger {
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
         if let payload = message.payload as? SwiftLogPayload {
             print(payload.label)                       // "com.demo.net"
-            print(payload.resolvedMetadata ?? [:])     // nested structure preserved
+            print(payload.resolvedMetadata)            // nested structure preserved
         }
         completion?(true)
     }

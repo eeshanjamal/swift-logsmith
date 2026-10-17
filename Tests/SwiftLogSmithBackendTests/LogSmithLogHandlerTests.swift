@@ -120,15 +120,26 @@ final class LogSmithLogHandlerTests: XCTestCase {
 
     //MARK: Metadata
 
-    func testResolveMetadata_WithNoPerStatementValues_ShouldReturnNil() {
+    func testResolveMetadata_WithOnlyBaselineMetadata_ShouldReturnBaseline() {
         // Arrange & Act
         let resolved = LogSmithLogHandler.resolveMetadata(base: ["base": "value"],
                                                           provider: nil,
                                                           explicit: nil,
                                                           error: nil)
 
-        // Assert — matches swift-log's own StreamLogHandler behaviour.
-        XCTAssertNil(resolved)
+        // Assert — a statement with nothing of its own must still carry the handler's baseline.
+        XCTAssertEqual(resolved, ["base": "value"])
+    }
+
+    func testResolveMetadata_WithNoMetadataAtAll_ShouldReturnEmpty() {
+        // Arrange & Act
+        let resolved = LogSmithLogHandler.resolveMetadata(base: [:],
+                                                          provider: nil,
+                                                          explicit: nil,
+                                                          error: nil)
+
+        // Assert
+        XCTAssertTrue(resolved.isEmpty)
     }
 
     func testResolveMetadata_WithAllThreeSources_ShouldApplySwiftLogPrecedence() {
@@ -144,10 +155,10 @@ final class LogSmithLogHandlerTests: XCTestCase {
                                                           error: nil)
 
         // Assert — explicit beats provider beats base.
-        XCTAssertEqual(resolved?["key"], "explicit")
-        XCTAssertEqual(resolved?["fromBase"], "yes")
-        XCTAssertEqual(resolved?["fromProvider"], "yes")
-        XCTAssertEqual(resolved?["fromExplicit"], "yes")
+        XCTAssertEqual(resolved["key"], "explicit")
+        XCTAssertEqual(resolved["fromBase"], "yes")
+        XCTAssertEqual(resolved["fromProvider"], "yes")
+        XCTAssertEqual(resolved["fromExplicit"], "yes")
     }
 
     func testResolveMetadata_WithError_ShouldContributeErrorEntries() {
@@ -161,8 +172,8 @@ final class LogSmithLogHandlerTests: XCTestCase {
                                                           error: SampleError())
 
         // Assert
-        XCTAssertNotNil(resolved?["error.message"])
-        XCTAssertTrue("\(resolved?["error.type"] ?? "")".contains("SampleError"))
+        XCTAssertNotNil(resolved["error.message"])
+        XCTAssertTrue("\(resolved["error.type"] ?? "")".contains("SampleError"))
     }
 
     func testFlatten_WithNestedMetadata_ShouldRenderReadableStrings() {
@@ -190,6 +201,39 @@ final class LogSmithLogHandlerTests: XCTestCase {
 
         // Assert
         XCTAssertEqual(mockLogger.lastLogMessage?.metadata["user"], #"["id": "7"]"#)
+    }
+
+    func testLog_WithHandlerMetadataAndNoPerStatementMetadata_ShouldDeliverHandlerMetadata() {
+        // Arrange — the `logger[metadataKey:]` idiom, as used for request-scoped context.
+        var logger = makeLogger()
+        logger[metadataKey: "request-id"] = "abc-123"
+
+        // Act
+        logAndWait(logger: logger) { logger in
+            logger.info("no per-statement metadata")
+        }
+
+        // Assert
+        let message = mockLogger.lastLogMessage
+        XCTAssertEqual(message?.metadata["request-id"], "abc-123")
+        let payload = message?.payload as? SwiftLogPayload
+        XCTAssertEqual(payload?.resolvedMetadata["request-id"], "abc-123")
+    }
+
+    func testLog_WithHandlerMetadataAndPerStatementMetadata_ShouldMergeBothWithStatementWinning() {
+        // Arrange
+        let logger = makeLogger(metadata: ["request-id": "abc-123", "shared": "handler"])
+
+        // Act
+        logAndWait(logger: logger) { logger in
+            logger.info("with per-statement metadata", metadata: ["shared": "statement", "extra": "1"])
+        }
+
+        // Assert
+        let flat = mockLogger.lastLogMessage?.metadata
+        XCTAssertEqual(flat?["request-id"], "abc-123")
+        XCTAssertEqual(flat?["extra"], "1")
+        XCTAssertEqual(flat?["shared"], "statement", "per-statement metadata should override handler metadata")
     }
 
     func testLog_WithContextEnabled_ShouldIncludeLabelAndSourceInMetadata() {
@@ -257,7 +301,7 @@ final class LogSmithLogHandlerTests: XCTestCase {
         XCTAssertEqual(payload?.event.level, .error)
         XCTAssertEqual(payload?.event.message.description, "Request failed")
         // The nested structure survives untouched, unlike the flattened copy.
-        XCTAssertEqual(payload?.resolvedMetadata?["user"], .dictionary(["id": "7"]))
+        XCTAssertEqual(payload?.resolvedMetadata["user"], .dictionary(["id": "7"]))
     }
 
     func testLog_ViaLogManagerDirectly_ShouldNotAttachPayload() {
