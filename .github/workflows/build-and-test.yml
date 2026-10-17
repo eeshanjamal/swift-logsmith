@@ -24,7 +24,7 @@ jobs:
         include:
           - { name: "macos-15, Swift 6.1", runner: macos-15, xcode: "16.4", swift: "6.1" }
           - { name: "macos-26, Swift 6.2", runner: macos-26, xcode: "26.3", swift: "6.2" }
-          - { name: "macos-26, newest Xcode", runner: macos-26 }
+          - { name: "macos-26, newest Xcode", runner: macos-26, coverage: true }
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -47,7 +47,28 @@ jobs:
         run: swift build
 
       - name: Test
-        run: swift test
+        run: swift test --enable-code-coverage
+
+      # Coverage is identical across toolchains, so it's only reported from one leg
+      # to avoid double-posting the same result to Coveralls.
+      - name: Export coverage
+        if: matrix.coverage
+        run: |
+          BIN_PATH="$(swift build --show-bin-path)"
+          XCTEST_PATH="$(find "${BIN_PATH}" -name '*.xctest' | head -1)"
+          # Paths are rewritten relative to the repo root so Coveralls can map them to source files.
+          xcrun llvm-cov export -format=lcov \
+            "${XCTEST_PATH}/Contents/MacOS/$(basename "${XCTEST_PATH}" .xctest)" \
+            -instr-profile "${BIN_PATH}/codecov/default.profdata" \
+            -ignore-filename-regex=".build|Tests" \
+            | sed "s|SF:${PWD}/|SF:|" > coverage.lcov
+
+      - name: Upload coverage to Coveralls
+        if: matrix.coverage
+        uses: coverallsapp/github-action@v2
+        with:
+          file: coverage.lcov
+          format: lcov
 
   swift-log-floor:
     name: Build & Test (swift-log lower bound)
