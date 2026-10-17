@@ -173,6 +173,92 @@ final class LogSmithTests: XCTestCase {
         }
     }
     
+    func testLogSmithLog_WithLogTypeAndPayload_ShouldDeliverPayloadMetadataAndSourceLocation() {
+        // Arrange
+        let logger = mockLogger!
+        let payload = TestLogPayload(id: 11)
+        LogSmith.addTag(InternalTag(internalTagType: .file))
+        LogSmith.addTag(InternalTag(internalTagType: .function))
+        LogSmith.addTag(InternalTag(internalTagType: .line))
+
+        // Act & Assert
+        expectCompletion(description: "Log with payload should be delivered") { fulfill in
+            LogSmith.log("bridged", logType: .warning, metadata: ["k": "v"], payload: payload,
+                         fileId: "Module/File.swift", function: "doWork()", line: 42) { _ in
+                let message = logger.lastLogMessage(for: .warning)
+                XCTAssertTrue(message?.payload === payload, "The payload should arrive as the same instance")
+                XCTAssertEqual(message?.metadata, ["k": "v"])
+
+                let tags = message?.tags ?? []
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.file })?.value, "Module/File.swift")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.function })?.value, "doWork()")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.line })?.value, "42")
+                fulfill()
+            }
+        }
+    }
+
+    func testLogSmithLogE_ShouldPopulateInternalTagsFromCallSite() {
+        // Arrange — the logX statics capture StaticStrings and hand them on as Strings; the text must survive intact.
+        let logger = mockLogger!
+        let expectedFile = "\(#fileID)"
+        let expectedFunction = "\(#function)"
+        LogSmith.addTag(InternalTag(internalTagType: .file))
+        LogSmith.addTag(InternalTag(internalTagType: .function))
+
+        // Act & Assert
+        expectCompletion(description: "Tags should reflect the call site") { fulfill in
+            LogSmith.logE("located") { _ in
+                let tags = logger.lastLogMessage(for: .error)?.tags ?? []
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.file })?.value, expectedFile)
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.function })?.value, expectedFunction)
+                fulfill()
+            }
+        }
+    }
+
+    func testLogSmithLogI_WithRuntimeSourceLocation_ShouldPopulateInternalTags() {
+        // Arrange — values built at runtime, which a StaticString parameter could never accept.
+        let logger = mockLogger!
+        let fileId = ["Module", "File.swift"].joined(separator: "/")
+        let function = "doWork" + "()"
+        LogSmith.addTag(InternalTag(internalTagType: .file))
+        LogSmith.addTag(InternalTag(internalTagType: .function))
+        LogSmith.addTag(InternalTag(internalTagType: .line))
+
+        // Act & Assert
+        expectCompletion(description: "Tags should carry the runtime source location") { fulfill in
+            LogSmith.logI("located", fileId: fileId, function: function, line: 42) { _ in
+                let tags = logger.lastLogMessage(for: .info)?.tags ?? []
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.file })?.value, "Module/File.swift")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.function })?.value, "doWork()")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.line })?.value, "42")
+                fulfill()
+            }
+        }
+    }
+
+    /// A wrapper written the way the documentation tells wrapper authors to: it forwards the caller's source information.
+    private func wrappedLogE(_ message: String, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        LogSmith.logE(message, fileId: fileId, function: function, line: line, completion: completion)
+    }
+
+    func testLogSmithLogE_ThroughWrapperThatForwardsSourceLocation_ShouldReportOriginalCallSite() {
+        // Arrange
+        let logger = mockLogger!
+        let expectedFunction = "\(#function)"
+        LogSmith.addTag(InternalTag(internalTagType: .function))
+
+        // Act & Assert — the tag must name this test, not the wrapper's own function.
+        expectCompletion(description: "Wrapper should report the original call site") { fulfill in
+            wrappedLogE("located") { _ in
+                let tags = logger.lastLogMessage(for: .error)?.tags ?? []
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.function })?.value, expectedFunction)
+                fulfill()
+            }
+        }
+    }
+
     // Helper to call the correct static method based on type
     private func sharedLogCall(type: LogType, completion: @escaping @Sendable (Bool) -> Void) {
         switch type {

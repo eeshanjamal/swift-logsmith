@@ -55,6 +55,16 @@ final class SecondMockLogger: ILogger, @unchecked Sendable {
     }
 }
 
+/// A minimal `LogPayload`, used to verify that a payload travels through the pipeline untouched.
+final class TestLogPayload: NSObject, LogPayload {
+    let id: Int
+
+    init(id: Int) {
+        self.id = id
+        super.init()
+    }
+}
+
 final class LogManagerTests: XCTestCase {
 
     var sut: LogManager!
@@ -336,6 +346,60 @@ final class LogManagerTests: XCTestCase {
                 XCTAssertNotNil(specificMsg)
                 XCTAssertTrue(specificMsg?.tags.contains(where: { $0.identifier == "ManagerTag" }) ?? false)
                 XCTAssertTrue(specificMsg?.tags.contains(where: { $0.identifier == "LoggerTag" }) ?? false)
+                fulfill()
+            }
+        }
+    }
+
+    func testLog_WithPayload_ShouldAttachSamePayloadInstanceToLogMessage() {
+        // Arrange
+        let payload = TestLogPayload(id: 7)
+        let logger = mockDefaultLogger
+
+        // Act & Assert
+        expectCompletion(description: "Logger should receive the payload") { fulfill in
+            sut.log(message: "payload test", logType: .info, payload: payload) { _ in
+                let received = logger?.lastLoggedMessage?.payload
+                XCTAssertTrue(received === payload, "The payload should arrive as the same instance")
+                XCTAssertEqual((received as? TestLogPayload)?.id, 7)
+                fulfill()
+            }
+        }
+    }
+
+    func testLog_WithoutPayload_ShouldLeavePayloadNil() {
+        // Arrange
+        let logger = mockDefaultLogger
+
+        // Act & Assert
+        expectCompletion(description: "Logger should receive the log") { fulfill in
+            sut.log(message: "no payload", logType: .info) { _ in
+                XCTAssertNotNil(logger?.lastLoggedMessage)
+                XCTAssertNil(logger?.lastLoggedMessage?.payload)
+                fulfill()
+            }
+        }
+    }
+
+    func testLog_WithExplicitSourceLocation_ShouldPopulateInternalTags() {
+        // Arrange — a facade only has runtime strings, never compile-time literals, so build them at runtime.
+        let fileId = ["Module", "File.swift"].joined(separator: "/")
+        let function = "doWork" + "()"
+        let logger = mockDefaultLogger
+
+        expectCompletion(description: "Add internal tags", fulfillmentCount: 3) { fulfill in
+            sut.addTag(InternalTag(internalTagType: .file)) { _ in fulfill() }
+            sut.addTag(InternalTag(internalTagType: .function)) { _ in fulfill() }
+            sut.addTag(InternalTag(internalTagType: .line)) { _ in fulfill() }
+        }
+
+        // Act & Assert
+        expectCompletion(description: "Tags should carry the explicit source location") { fulfill in
+            sut.log(message: "located", logType: .info, fileId: fileId, function: function, line: 42) { _ in
+                let tags = logger?.lastLoggedMessage?.tags ?? []
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.file })?.value, "Module/File.swift")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.function })?.value, "doWork()")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.line })?.value, "42")
                 fulfill()
             }
         }

@@ -8,23 +8,40 @@ on:
 
 jobs:
   build-and-test:
-    name: Build & Test (${{ matrix.runner }})
+    name: Build & Test (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        # macos-15's default Xcode (16.4) carries Swift 6.0.x, exercising Package@swift-6.0.swift.
-        # macos-26's default Xcode (26.5) carries Swift 6.3, exercising the default Package.swift.
-        runner: [macos-15, macos-26]
+        # Each leg exercises a different manifest. SwiftPM matches the toolchain's major.minor against
+        # Package@swift-<major>.<minor>.swift and falls back to Package.swift when nothing matches:
+        #   Swift 6.1.x -> Package@swift-6.1.swift  (core only; the backend needs Swift 6.2+)
+        #   Swift 6.2.x -> Package@swift-6.2.swift  (core + backend)
+        #   newest      -> Package.swift            (core + backend)
+        # Package@swift-6.0.swift is deliberately not exercised.
+        # Where `swift` is set, the toolchain version is asserted, so a runner-image change fails loudly
+        # instead of silently testing a different manifest. The last leg tracks the image's default Xcode.
+        include:
+          - { name: "macos-15, Swift 6.1", runner: macos-15, xcode: "16.4", swift: "6.1" }
+          - { name: "macos-26, Swift 6.2", runner: macos-26, xcode: "26.3", swift: "6.2" }
+          - { name: "macos-26, newest Xcode", runner: macos-26, coverage: true }
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Select Xcode ${{ matrix.xcode }}
+        if: matrix.xcode
+        run: sudo xcode-select -s /Applications/Xcode_${{ matrix.xcode }}.app
 
       - name: Show environment
         run: |
           sw_vers
           xcodebuild -version
           swift --version
+
+      - name: Check toolchain
+        if: matrix.swift
+        run: swift --version 2>&1 | grep -Eq "Swift version ${{ matrix.swift }}[. ]"
 
       - name: Build
         run: swift build
@@ -35,7 +52,7 @@ jobs:
       # Coverage is identical across toolchains, so it's only reported from one leg
       # to avoid double-posting the same result to Coveralls.
       - name: Export coverage
-        if: matrix.runner == 'macos-26'
+        if: matrix.coverage
         run: |
           BIN_PATH="$(swift build --show-bin-path)"
           XCTEST_PATH="$(find "${BIN_PATH}" -name '*.xctest' | head -1)"
@@ -47,8 +64,57 @@ jobs:
             | sed "s|SF:${PWD}/|SF:|" > coverage.lcov
 
       - name: Upload coverage to Coveralls
-        if: matrix.runner == 'macos-26'
+        if: matrix.coverage
         uses: coverallsapp/github-action@v2
         with:
           file: coverage.lcov
           format: lcov
+
+  swift-log-floor:
+    name: Build & Test (swift-log lower bound)
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Package.resolved pins one swift-log version, but consumers resolve from the manifest's range. This builds
+      # against the bottom of that range so the declared lower bound stays truthful. The bound is read from
+      # Package.swift, so bumping it there moves this job with it.
+      - name: Pin swift-log to the manifest's lower bound
+        run: |
+          floor=$(sed -n 's|.*swift-log.git", from: "\([0-9.]*\)".*|\1|p' Package.swift)
+          [ -n "$floor" ] || { echo "Could not read the swift-log lower bound from Package.swift"; exit 1; }
+          echo "swift-log lower bound: $floor"
+          swift package resolve
+          swift package resolve swift-log --version "$floor"
+          pinned=$(grep -A6 '"identity" : "swift-log"' Package.resolved | sed -n 's/.*"version" : "\(.*\)".*/\1/p')
+          [ "$pinned" = "$floor" ] || { echo "Expected swift-log $floor but resolved '$pinned'"; exit 1; }
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
+
+  api-compat:
+    name: API compatibility
+    runs-on: macos-26
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0 # the baseline is the latest release tag
+
+      # Intentional breaking changes are listed in .github/api-breakage-allowlist.txt: one swift-api-digester message
+      # per line, nothing else (the file is parsed verbatim, so it cannot hold comments). Once the release that ships
+      # them is tagged it becomes the baseline here, and the entries can be deleted.
+      #
+      # SwiftLogSmithBackend is skipped, with a message in the log, for as long as the baseline predates it (it first
+      # ships in 2.0.0). From that release on it is checked with no further edits. A misspelled product still fails.
+      - name: Diff the public API against the latest release
+        run: |
+          baseline=$(git describe --tags --abbrev=0 --match 'v[0-9]*')
+          echo "baseline: $baseline"
+          swift package diagnose-api-breaking-changes "$baseline" \
+            --products SwiftLogSmith SwiftLogSmithBackend \
+            --breakage-allowlist-path .github/api-breakage-allowlist.txt
