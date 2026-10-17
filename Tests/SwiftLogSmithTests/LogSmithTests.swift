@@ -173,7 +173,7 @@ final class LogSmithTests: XCTestCase {
         }
     }
     
-    func testLogSmithLog_WithLogTypeAndPayload_ShouldDeliverPayloadMetadataAndSourceLocation() {
+    func testLogInternal_WithLogTypeAndPayload_ShouldDeliverPayloadMetadataAndSourceLocation() {
         // Arrange
         let logger = mockLogger!
         let payload = TestLogPayload(id: 11)
@@ -183,8 +183,8 @@ final class LogSmithTests: XCTestCase {
 
         // Act & Assert
         expectCompletion(description: "Log with payload should be delivered") { fulfill in
-            LogSmith.log("bridged", logType: .warning, metadata: ["k": "v"], payload: payload,
-                         fileId: "Module/File.swift", function: "doWork()", line: 42) { _ in
+            LogSmith.logInternal("bridged", logType: .warning, metadata: ["k": "v"], payload: payload,
+                                 fileId: "Module/File.swift", function: "doWork()", line: 42) { _ in
                 let message = logger.lastLogMessage(for: .warning)
                 XCTAssertTrue(message?.payload === payload, "The payload should arrive as the same instance")
                 XCTAssertEqual(message?.metadata, ["k": "v"])

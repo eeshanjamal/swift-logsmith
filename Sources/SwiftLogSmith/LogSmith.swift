@@ -341,17 +341,18 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
         shared.queue.async { shared.defaultManager.log(message: message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
     }
 
-    /// Logs a message with an explicit ``LogType`` and optional structured payload, using source information supplied at runtime.
+    /// Queues a message for the default manager with an explicit ``LogType``, optional structured payload and source information.
     ///
-    /// This is the entry point for logging facades that bridge into `LogSmith` — most notably the `SwiftLogSmithBackend`
-    /// module, which routes `swift-log` messages through it. Like every logging function, it takes `fileId` and `function`
-    /// as `String` values, so a facade can forward the original call site it received at runtime.
+    /// This is the entry point for code inside this package that logs on behalf of someone else: the `SwiftLogSmithBackend`
+    /// module routes `swift-log` messages through it. It is `package`-scoped, so the package's own targets can call it and
+    /// consumers of the library cannot. `fileId` and `function` are `String` values so that a call site received at runtime
+    /// can be forwarded.
     ///
     /// Messages logged here go through the same serial queue as every other `LogSmith` operation, so their ordering
     /// relative to calls like ``addLogger(newLogger:minLogLevel:minLogType:_:)`` or ``setMinimumLogLevel(_:)`` is preserved.
     ///
-    /// > Note: For ordinary application logging prefer ``log(_:metadata:fileId:function:line:completion:)`` and its
-    /// severity-specific variants, which capture the call site automatically.
+    /// The source location parameters have no defaults on purpose: a caller has to forward its own caller's location
+    /// explicitly, so it cannot end up logging its own file and function by accident.
     ///
     /// - Parameters:
     ///   - message: The message string to log.
@@ -362,7 +363,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - function: The source function name where the log originated.
     ///   - line: The source line number where the log originated.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func log(_ message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+    package static func logInternal(_ message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String, function: String, line: UInt, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: logType, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion) }
     }
 

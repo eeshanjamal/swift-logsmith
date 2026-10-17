@@ -167,13 +167,13 @@ public struct LogSmithLogHandler: LogHandler {
 
         switch self.destination {
         case .shared:
-            LogSmith.log(event.message.description,
-                         logType: logType,
-                         metadata: flatMetadata,
-                         payload: payload,
-                         fileId: event.file,
-                         function: event.function,
-                         line: event.line)
+            LogSmith.logInternal(event.message.description,
+                                 logType: logType,
+                                 metadata: flatMetadata,
+                                 payload: payload,
+                                 fileId: event.file,
+                                 function: event.function,
+                                 line: event.line)
         case .manager(let manager):
             manager.log(message: event.message.description,
                         logType: logType,
