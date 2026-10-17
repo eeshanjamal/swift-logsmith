@@ -1,0 +1,19 @@
+API breakage: func LogSmith.log(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.log(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
+API breakage: func LogManager.log(message:logType:metadata:fileId:function:line:completion:) has been removed
