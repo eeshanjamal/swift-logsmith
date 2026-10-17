@@ -39,7 +39,8 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/weichsel/ZIPFoundation.git", from: "0.9.0"),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.5.0"),
-        .package(url: "https://github.com/apple/swift-log.git", from: "1.11.0")
+        // 1.12.0 is the first swift-log release with `LogEvent.error`, which SwiftLogSmithBackend reads.
+        .package(url: "https://github.com/apple/swift-log.git", from: "1.12.0")
     ],
     targets: [
         // Targets are the basic building blocks of a package, defining a module or a test suite.
