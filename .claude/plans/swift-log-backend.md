@@ -132,7 +132,7 @@ defaults. Not fixing the ordering itself — that would be a breaking change.
 - [x] Isolated mode (opt-in) → user-owned `LogManager`
 - [x] Metadata precedence: handler `metadata` < `metadataProvider` < per-call `event.metadata`
 - [x] `subscript(metadataKey:)`, `metadata`, `logLevel`, `metadataProvider`
-- [x] `SwiftLogPayload.swift` — final, checked Sendable, holds `label`/`source`/`LogEvent`
+- [x] `SwiftLogPayload.swift` — final, checked Sendable, holds `label`/`LogEvent`/`resolvedMetadata` (`source` is read from `event.source`)
 - [x] `LogLevelMapping.swift`
 - [x] `Bootstrap.swift` — `bootstrapWithLogSmith(...)`
 - [x] `public import Logging` (required: `InternalImportsByDefault` is on)

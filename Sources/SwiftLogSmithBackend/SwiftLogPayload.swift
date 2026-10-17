@@ -36,13 +36,10 @@ public final class SwiftLogPayload: NSObject, LogPayload {
     /// The label of the `Logger` that emitted this message, e.g. `"com.example.network"`.
     public let label: String
 
-    /// The source where the log originated — usually the module name.
-    public let source: String
-
     /// The original, unmodified `swift-log` event.
     ///
-    /// Includes the raw `Logger.Message`, the per-call metadata, the associated error (if any) and the
-    /// full source location.
+    /// Includes the raw `Logger.Message`, the per-call metadata, the associated error (if any), the
+    /// full source location and `source`, which is usually the module name.
     public let event: LogEvent
 
     /// The effective metadata after merging; empty when the handler had none and the statement carried none.
@@ -56,7 +53,6 @@ public final class SwiftLogPayload: NSObject, LogPayload {
 
     internal init(label: String, event: LogEvent, resolvedMetadata: Logger.Metadata) {
         self.label = label
-        self.source = event.source
         self.event = event
         self.resolvedMetadata = resolvedMetadata
         super.init()

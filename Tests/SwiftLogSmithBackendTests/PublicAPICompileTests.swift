@@ -31,8 +31,7 @@ final class PublicAPICompileTests: XCTestCase {
         func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
             if let payload = message.payload as? SwiftLogPayload {
                 _ = payload.label
-                _ = payload.source
-                _ = payload.event
+                _ = payload.event.source
                 _ = payload.resolvedMetadata
             }
             completion?(true)
