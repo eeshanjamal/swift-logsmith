@@ -202,7 +202,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func log(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a trace message to all active loggers with `LogType.trace`.
@@ -219,7 +219,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logT(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a debug message to all active loggers with `LogType.debug`.
@@ -236,7 +236,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logD(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a notice message to all active loggers with `LogType.notice`.
@@ -253,7 +253,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logN(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs an informative message to all active loggers with `LogType.info`.
@@ -270,7 +270,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logI(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a warning message to all active loggers with `LogType.warning`.
@@ -287,7 +287,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logW(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs an error message to all active loggers with `LogType.error`.
@@ -304,7 +304,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logE(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a critical message to all active loggers with `LogType.critical`.
@@ -321,7 +321,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logC(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a fault message to all active loggers with `LogType.fault`.
@@ -338,15 +338,15 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
     public static func logF(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+        logInternal(message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
     }
 
     /// Queues a message for the default manager with an explicit ``LogType``, optional structured payload and source information.
     ///
-    /// This is the entry point for code inside this package that logs on behalf of someone else: the `SwiftLogSmithBackend`
-    /// module routes `swift-log` messages through it. It is `package`-scoped, so the package's own targets can call it and
-    /// consumers of the library cannot. `fileId` and `function` are `String` values so that a call site received at runtime
-    /// can be forwarded.
+    /// The single place every logging function funnels through: the `log`, `logT` … `logF` facades pass their own severity and
+    /// their caller's source location, and the `SwiftLogSmithBackend` module passes the severity, payload and call site of the
+    /// `swift-log` message it received. It is `package`-scoped, so the package's own targets can call it and consumers of the
+    /// library cannot. `fileId` and `function` are `String` values so that a call site received at runtime can be forwarded.
     ///
     /// Messages logged here go through the same serial queue as every other `LogSmith` operation, so their ordering
     /// relative to calls like ``addLogger(newLogger:minLogLevel:minLogType:_:)`` or ``setMinimumLogLevel(_:)`` is preserved.
