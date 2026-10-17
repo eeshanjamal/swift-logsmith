@@ -61,8 +61,9 @@ LogSmith.setMinimumLogLevel(.error)   // two hops
 manager.log(...)                       // one hop — can land first
 ```
 
-Instead the bridge routes through a single new `LogSmith` static, so every operation stays behind
-the same hop. A user-owned `LogManager` remains available as opt-in isolation.
+Instead the bridge routes through a single `LogSmith` funnel, `logInternal`, which every first-party
+logging function uses too, so every operation stays behind the same hop. A user-owned `LogManager`
+remains available as opt-in isolation.
 
 ### Why no `minimumLogLevel` / `minimumLogType` getters
 
@@ -113,7 +114,8 @@ defaults. Not fixing the ordering itself — that would be a breaking change.
 - [x] `Core/LogManager.swift`: refactor `extractTags` / `LogTagsExtractor.extract` to `String`
 - [x] `LogSmith.swift`: ~~keep `StaticString` on all nine `log*` statics~~ — superseded: all nine now take `String`
       (see "Found during pre-merge testing")
-- [x] `LogSmith.swift`: add one forwarding static with `payload` + `String` source location
+- [x] `LogSmith.swift`: add one package-scoped funnel, `logInternal`, with `payload` + `String` source location;
+      every `log*` facade routes through it (see "Found during pre-merge testing")
 - [x] Confirm `LogMessage` still has **checked** `Sendable` (no `@unchecked` crept in)
 
 ### Manifests
@@ -126,7 +128,7 @@ defaults. Not fixing the ordering itself — that would be a breaking change.
 ### Backend (`Sources/SwiftLogSmithBackend/`)
 
 - [x] `LogSmithLogHandler.swift` — struct, implements `log(event:)`
-- [x] Shared mode (default) → routes via the new `LogSmith` static
+- [x] Shared mode (default) → routes via `LogSmith.logInternal`
 - [x] Isolated mode (opt-in) → user-owned `LogManager`
 - [x] Metadata precedence: handler `metadata` < `metadataProvider` < per-call `event.metadata`
 - [x] `subscript(metadataKey:)`, `metadata`, `logLevel`, `metadataProvider`
@@ -272,6 +274,20 @@ entries can be deleted.
 not representable and `@objcMembers` omits such members silently — so no Objective-C caller can be broken. They are
 now visible (`+[LogSmith logE:metadata:fileId:function:line:completion:]` and so on); Objective-C has no default
 arguments, so callers pass file, function and line explicitly.
+
+### The bridge entry point is `LogSmith.logInternal`, package-scoped
+
+It was a public `LogSmith.log(_:logType:metadata:payload:…)`, which shared its name with the level-less
+`LogSmith.log(_:metadata:…)` facade and differed from it only by a label (review feedback). It is now
+`logInternal` with `package` access: the backend, a separate module in the same package, can call it, while a
+consumer package cannot (`'logInternal' is inaccessible due to 'package' protection level`). `internal` would not
+have worked, because the backend is a different module. It is absent from the public documentation and the
+Objective-C header, and being new in this release it has no effect on the API check.
+
+All nine `log*` facades now delegate to it, so the hop onto `LogSmith`'s queue exists once and the first-party
+facades and the backend share the exact same path. Its `fileId`/`function`/`line` parameters have no defaults, so
+a caller cannot log its own location by accident. A release-build benchmark shows no difference from the previous
+shape beyond run-to-run noise.
 
 ### swift-log lower bound is 1.12.0, not 1.11.0
 
