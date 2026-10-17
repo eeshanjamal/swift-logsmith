@@ -182,10 +182,9 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     /// - Extract (logger-specific) tags for each active logger's ``LogTagger``.
     /// - Construct a new ``LogMessage`` for each logger with all provided & extracted info and dispatches to it.
     ///
-    /// > Note: `fileId` and `function` are plain `String` values rather than `StaticString`. They are still captured
-    /// automatically by the compiler via `#fileID`/`#function`, so ordinary call sites need not provide them. Using
-    /// `String` additionally lets callers that receive source information at runtime — such as a logging facade
-    /// bridging into this manager — forward the original call site, which a `StaticString` cannot represent.
+    /// > Note: `fileId` and `function` are captured automatically by the compiler via `#fileID`/`#function`, so ordinary
+    /// call sites need not provide them. Callers that receive source information at runtime — such as a logging facade
+    /// bridging into this manager — can forward the original call site.
     ///
     /// - Parameters:
     ///   - message: The raw message string.
