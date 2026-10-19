@@ -143,7 +143,7 @@ LogSmith.log("Network status is stable")
 // [Production] 📢 Network status is stable
 ```
 
-### 4. Using SwiftLogSmith as a swift-log Backend
+### 4. Using as a swift-log Backend
 
 Add the `SwiftLogSmithBackend` product and bootstrap once at launch. Every `Logger(label:)` in the process —
 **including loggers inside the packages you depend on** — is then delivered to your registered loggers,

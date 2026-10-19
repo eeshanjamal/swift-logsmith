@@ -17,7 +17,7 @@ import SwiftLogSmithBackend // Deliberately NOT `@testable`: this file may only 
 /// declarations and so cannot notice when something meant to be `public` is accidentally `internal`. Imports are
 /// per file, so this file sees only the public surface: if an API stops being public, it stops compiling.
 ///
-/// The README's "Using SwiftLogSmith as a swift-log Backend" snippets are mirrored below; keep them in sync.
+/// The README's "Using as a swift-log Backend" snippets are mirrored below; keep them in sync.
 ///
 /// > Note: Nothing here runs a bootstrap. `LoggingSystem.bootstrap` traps on a second call per process, so the
 /// bootstrap functions are only referenced inside closures that are never invoked.
