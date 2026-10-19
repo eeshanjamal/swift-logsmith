@@ -17,11 +17,11 @@ A lightweight, flexible, and thread-safe logging library for Swift, designed to 
 - **🚀 Zero Config:** Start logging instantly with `LogSmith.log()`. No setup required.
 - **🖥️ System Logging:** Seamless integration with Apple's unified logging system (`os.Logger`) via `OSLogger`.
 - **📂 File Logging:** Robust file logging with `FileLogger`, featuring automatic rolling, archiving, and purging based on variety of `RollingFrequency` implementations.
+- **🔀 Available as swift-log Logging Backend:** Use SwiftLogSmith loggers as a logging backend for [swift-log](https://github.com/apple/swift-log).
 - **🏷️ Contextual Tags:** Add global or per-logger tags (e.g., `[User: 123]`, `[Env: Dev]`) to track context across your logs.
 - **🎨 Custom Formatting:** Design your own log format using the powerful `LogFormatter` builder pattern.
 - **🔒 Thread Safe:** All operations are thread-safe, following modern Swift 6 concurrency principles.
 - **🔌 Obj-C Support:** Designed to be easily used in Swift and Objective-C interoperable projects.
-- **🌉 swift-log Backend:** Opt into `SwiftLogSmithBackend` to capture logs from any package using [apple/swift-log](https://github.com/apple/swift-log), including your third-party dependencies.
 
 ## Installation
 
