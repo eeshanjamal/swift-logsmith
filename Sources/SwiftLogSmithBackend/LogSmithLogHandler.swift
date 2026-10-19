@@ -30,16 +30,12 @@ public import SwiftLogSmith
 /// // Delivered to OSLogger and FileLogger, just like LogSmith.logE would be.
 /// ```
 ///
-/// **Filtering.** `swift-log` performs its own level check before calling a handler, so the effective
-/// threshold is the *stricter* of ``logLevel`` and SwiftLogSmith's own minimums. Because these two systems
-/// order their low-severity cases differently (see below), prefer to filter bridged loggers with
-/// ``logLevel`` — or `bootstrapWithLogSmith(defaultLogLevel:)` — and leave
-/// `LogSmith.setMinimumLogType(_:)` at its permissive default.
-///
-/// > Warning: `LogType` orders its raw values `notice` < `info` < `debug` < `trace`, which is
-/// the reverse of `swift-log`'s `trace` < `debug` < `info` < `notice`. Since SwiftLogSmith filters on those
-/// raw values, calling `LogSmith.setMinimumLogType(.info)` will silently discard `swift-log` `.notice`
-/// messages even though `.notice` is the more severe of the two.
+/// **Filtering.** `swift-log` performs its own level check before calling a handler, and SwiftLogSmith's minimums
+/// (`LogSmith.setMinimumLogType(_:)` and `LogSmith.setMinimumLogLevel(_:)`) apply after it, so a message is
+/// delivered only if it passes both. They order severity the same way (`trace` lowest, `critical` highest), so
+/// the effective threshold is simply the *stricter* of ``logLevel`` and those minimums. Filtering with
+/// ``logLevel`` — or `bootstrapWithLogSmith(defaultLogLevel:)` — is the cheaper choice, because `swift-log`
+/// skips the call entirely and the payload and metadata are never built for a message that would be dropped later.
 ///
 /// **Structured metadata.** `swift-log` metadata is a tree, while `LogMessage.metadata` is a
 /// flat `[String: String]`. The handler populates both: a stringified rendering lands in `metadata` so the

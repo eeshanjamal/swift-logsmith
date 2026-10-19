@@ -35,13 +35,15 @@ public import Foundation
     
     /// Sets the global minimum log level.
     ///
-    /// This will set the mininum ``LogLevel`` of the manager (applicable to all loggers of it).
+    /// This will set the mininum ``LogLevel`` of the manager (applicable to all loggers of it). Logs whose level is lower are dropped;
+    /// ``LogLevel/all``, the default, applies no minimum.
     /// - Parameter logLevel: The minimum ``LogLevel`` to apply.
     @objc func setMinimumLogLevel(_ logLevel: LogLevel)
     
     /// Sets the global minimum log type.
     ///
-    /// This will set the minimum ``LogType`` of the manager (applicable to all loggers of it).
+    /// This will set the minimum ``LogType`` of the manager (applicable to all loggers of it). Logs whose type is less severe are dropped;
+    /// ``LogType/none``, the default, applies no minimum.
     /// - Parameter logType: The minimum ``LogType`` to apply.
     @objc func setMinimumLogType(_ logType: LogType)
 }
@@ -75,20 +77,20 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     private var loggerItems: [LoggerItem]
     private let logTagger = LogTagger()
     private let queue = DispatchQueue(label: "com.swift.logsmith.logman.\(NSUUID().uuidString)")
-    private var minLogLevel = LogLevel.default
+    private var minLogLevel = LogLevel.all
     private var minLogType = LogType.none
     
     /// Creates a `LogManager` instance.
     ///
-    /// >Note: You can't initialize the log manager instance properties `minimumLogLevel` & `minimumLogType` directly from the constructor. So, when creating a new instance they will be defaults to `LogLevel.default` & `LogType.none`.
+    /// >Note: You can't initialize the log manager instance properties `minimumLogLevel` & `minimumLogType` directly from the constructor. So, when creating a new instance they will be defaults to `LogLevel.all` & `LogType.none`.
     /// However, they can be later updated using ``setMinimumLogLevel(_:)`` & ``setMinimumLogType(_:)``.
     ///
     /// - Parameters:
     ///   - identifier: A unique string to identify this manager. It helps in storing instance specific properties (e.g., `minLogLevel` or `minLogType`) in persistance storage (such as `UserDefaults`).
     ///   - defaultLogger: Any ``ILogger`` compliant class instance to use as default logger. It's mandatory because log manager instances must always have at least one logger (as default).
-    ///   - minLogLevel: The minimum ``LogLevel`` for the default logger. Defaults to `.default` (which means available to all log levels).
+    ///   - minLogLevel: The minimum ``LogLevel`` for the default logger. Defaults to `.all` (which means available to all log levels).
     ///   - minLogType: The minimum ``LogType`` for the default logger. Defaults to `.none` (which means available to all log types).
-    public init(identifier: String, defaultLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none) {
+    public init(identifier: String, defaultLogger: any ILogger, minLogLevel: LogLevel = .all, minLogType: LogType = .none) {
         self.identifier = identifier
         self.loggerItems = []
         super.init()
@@ -97,7 +99,7 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     
     //MARK: Logger API's
     
-    public func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .all, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
             // Check for instance identity to prevent adding the exact same logger twice
             guard !self.loggerItems.contains(where: { $0.logger === newLogger }) else {
@@ -122,7 +124,7 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
         }
     }
     
-    public func replaceDefaultLogger(with newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public func replaceDefaultLogger(with newLogger: any ILogger, minLogLevel: LogLevel = .all, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
         queue.async {
             if let index = self.loggerItems.firstIndex(where: { $0.isDefault }) {
                 self.loggerItems.remove(at: index)
@@ -150,20 +152,22 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
         }
     }
     
+    /// Returns the minimum ``LogLevel`` of the manager. May be overridden by a ``UserDefaults`` value (if provided); a value that is not a valid raw value is ignored.
     private func getMinimumLogLevel() -> LogLevel {
         let minLogLevelKey = "\(identifier).\(defaults.minimumLogLevel.rawValue)"
-        if UserDefaults.standard.contains(key: minLogLevelKey) {
-            return LogLevel.init(rawValue: UserDefaults.standard.integer(forKey: minLogLevelKey))!
+        if UserDefaults.standard.contains(key: minLogLevelKey), let overriddenLevel = LogLevel(rawValue: UserDefaults.standard.integer(forKey: minLogLevelKey)) {
+            return overriddenLevel
         }
         else {
             return minLogLevel
         }
     }
     
+    /// Returns the minimum ``LogType`` of the manager. May be overridden by a ``UserDefaults`` value (if provided); a value that is not a valid raw value is ignored.
     private func getMinimumLogType() -> LogType {
         let minLogTypeKey = "\(identifier).\(defaults.minimumLogType.rawValue)"
-        if UserDefaults.standard.contains(key: minLogTypeKey) {
-            return LogType.init(rawValue: UserDefaults.standard.integer(forKey: minLogTypeKey))!
+        if UserDefaults.standard.contains(key: minLogTypeKey), let overriddenType = LogType(rawValue: UserDefaults.standard.integer(forKey: minLogTypeKey)) {
+            return overriddenType
         }
         else {
             return minLogType
@@ -387,22 +391,22 @@ private final class LoggerItem: NSObject, Sendable {
         super.init()
     }
     
-    /// Returns the minimum ``LogLevel`` for this specific logger. May overriden by ``UserDefaults`` value (If provided).
+    /// Returns the minimum ``LogLevel`` for this specific logger. May overriden by ``UserDefaults`` value (If provided); a value that is not a valid raw value is ignored.
     internal func getMinimumLogLevel() -> LogLevel {
         let minLogLevelKey = "\(parent.identifier).\(loggerName).\(LogManager.defaults.minimumLogLevel.rawValue)"
-        if UserDefaults.standard.contains(key: minLogLevelKey) {
-            return LogLevel.init(rawValue: UserDefaults.standard.integer(forKey: minLogLevelKey))!
+        if UserDefaults.standard.contains(key: minLogLevelKey), let overriddenLevel = LogLevel(rawValue: UserDefaults.standard.integer(forKey: minLogLevelKey)) {
+            return overriddenLevel
         }
         else {
             return minLogLevel
         }
     }
     
-    /// Returns the minimum ``LogType`` for this specific logger. May overriden by ``UserDefaults`` value (If provided).
+    /// Returns the minimum ``LogType`` for this specific logger. May overriden by ``UserDefaults`` value (If provided); a value that is not a valid raw value is ignored.
     internal func getMinimumLogType() -> LogType {
         let minLogTypeKey = "\(parent.identifier).\(loggerName).\(LogManager.defaults.minimumLogType.rawValue)"
-        if UserDefaults.standard.contains(key: minLogTypeKey) {
-            return LogType.init(rawValue: UserDefaults.standard.integer(forKey: minLogTypeKey))!
+        if UserDefaults.standard.contains(key: minLogTypeKey), let overriddenType = LogType(rawValue: UserDefaults.standard.integer(forKey: minLogTypeKey)) {
+            return overriddenType
         }
         else {
             return minLogType

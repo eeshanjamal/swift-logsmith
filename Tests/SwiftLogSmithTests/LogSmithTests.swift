@@ -57,7 +57,7 @@ final class LogSmithTests: XCTestCase {
     override func tearDown() {
         LogSmith.removeLogger(logger: mockLogger)
         // Reset levels to default
-        LogSmith.setMinimumLogLevel(.default)
+        LogSmith.setMinimumLogLevel(.all)
         LogSmith.setMinimumLogType(.none)
         // Cleanup tags that might have been added
         LogSmith.removeTag(identifier: LogTagIdentifiers.date)
@@ -131,7 +131,7 @@ final class LogSmithTests: XCTestCase {
         }
 
         // 2. Test addTag / removeTag
-        LogSmith.setMinimumLogLevel(.default)
+        LogSmith.setMinimumLogLevel(.all)
         let tag = ExternalTag(identifier: "TestStaticTag", value: "Value")
         LogSmith.addTag(tag)
         

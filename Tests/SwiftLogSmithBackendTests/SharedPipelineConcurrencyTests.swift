@@ -34,7 +34,7 @@ final class SharedPipelineConcurrencyTests: XCTestCase {
         expectCompletion(description: "logger removed") { fulfill in
             LogSmith.removeLogger(logger: mockLogger) { _ in fulfill() }
         }
-        LogSmith.setMinimumLogLevel(.default)
+        LogSmith.setMinimumLogLevel(.all)
         LogSmith.setMinimumLogType(.none)
         mockLogger = nil
         super.tearDown()

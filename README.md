@@ -192,11 +192,11 @@ let manager = LogManager(identifier: "swift-log", defaultLogger: OSLogger())
 LoggingSystem.bootstrapWithLogSmith(manager: manager)
 ```
 
-> **Filtering:** `swift-log` performs its own level check before calling the backend, so the effective
-> threshold is the stricter of the two systems. Prefer filtering with `logger.logLevel` or
-> `bootstrapWithLogSmith(defaultLogLevel:)` and leave `LogSmith.setMinimumLogType(_:)` at its default —
-> `LogType` orders `notice` < `info` < `debug` < `trace`, which is the reverse of `swift-log`'s ordering,
-> so `setMinimumLogType(.info)` would discard `swift-log` `.notice` messages.
+> **Filtering:** `swift-log` performs its own level check before calling the backend, and SwiftLogSmith's
+> minimums apply after it, so a message is delivered only if it passes both. They order severity the same way
+> (`trace` lowest, `critical` highest), so the effective threshold is simply the stricter of the two. Filtering
+> with `logger.logLevel` or `bootstrapWithLogSmith(defaultLogLevel:)` is cheaper, because the payload and
+> metadata are never built for a message that would be dropped later.
 
 ## Architecture
 

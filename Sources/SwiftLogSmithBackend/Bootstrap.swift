@@ -30,8 +30,8 @@ extension LoggingSystem {
     ///
     /// - Parameters:
     ///   - defaultLogLevel: The initial `logLevel` for every handler created. Defaults to `.trace`, which
-    ///     leaves filtering to SwiftLogSmith's own minimums. Raise it to filter on the `swift-log` side —
-    ///     see ``LogSmithLogHandler`` for why that is usually the better place to do it.
+    ///     leaves filtering to SwiftLogSmith's own minimums. Raise it to filter on the `swift-log` side,
+    ///     which is cheaper — see ``LogSmithLogHandler``.
     ///   - metadataProvider: A provider consulted on each log statement, typically to pick up contextual
     ///     values such as a trace identifier. Defaults to `nil`.
     ///   - includesSwiftLogContextInMetadata: Whether each message's flat metadata should include the

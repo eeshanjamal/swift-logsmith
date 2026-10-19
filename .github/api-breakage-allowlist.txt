@@ -17,3 +17,6 @@ API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) ha
 API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
 API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
 API breakage: func LogManager.log(message:logType:metadata:fileId:function:line:completion:) has been removed
+API breakage: enumelement LogLevel.all has been added as a new enum case
+API breakage: enumelement LogLevel.default has been removed
+API breakage: enumelement LogLevel.undefined has been removed

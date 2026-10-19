@@ -300,7 +300,7 @@ final class LogManagerTests: XCTestCase {
     
     func testCombinedFiltering_LoggerItemLevel() {
         let strictLogger = SecondMockLogger()
-        sut.setMinimumLogLevel(.default)
+        sut.setMinimumLogLevel(.all)
         sut.setMinimumLogType(.none)
 
         expectCompletion(description: "Add strict logger with combined filters") { fulfill in
