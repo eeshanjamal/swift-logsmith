@@ -39,12 +39,10 @@ extension LoggingSystem {
     public static func bootstrapWithLogSmith(defaultLogLevel: Logger.Level = .trace,
                                              metadataProvider: Logger.MetadataProvider? = nil,
                                              includesSwiftLogContextInMetadata: Bool = true) {
-        LoggingSystem.bootstrap({ label, provider in
-            LogSmithLogHandler(label: label,
-                               logLevel: defaultLogLevel,
-                               metadataProvider: provider,
-                               includesSwiftLogContextInMetadata: includesSwiftLogContextInMetadata)
-        }, metadataProvider: metadataProvider)
+        LoggingSystem.bootstrap(logSmithHandlerFactory(manager: nil,
+                                                       defaultLogLevel: defaultLogLevel,
+                                                       includesSwiftLogContextInMetadata: includesSwiftLogContextInMetadata),
+                                metadataProvider: metadataProvider)
     }
 
     /// Installs SwiftLogSmith as the `swift-log` backend, delivering to a caller-owned `LogManager`.
@@ -72,12 +70,38 @@ extension LoggingSystem {
                                              defaultLogLevel: Logger.Level = .trace,
                                              metadataProvider: Logger.MetadataProvider? = nil,
                                              includesSwiftLogContextInMetadata: Bool = true) {
-        LoggingSystem.bootstrap({ label, provider in
-            LogSmithLogHandler(label: label,
-                               manager: manager,
-                               logLevel: defaultLogLevel,
-                               metadataProvider: provider,
-                               includesSwiftLogContextInMetadata: includesSwiftLogContextInMetadata)
-        }, metadataProvider: metadataProvider)
+        LoggingSystem.bootstrap(logSmithHandlerFactory(manager: manager,
+                                                       defaultLogLevel: defaultLogLevel,
+                                                       includesSwiftLogContextInMetadata: includesSwiftLogContextInMetadata),
+                                metadataProvider: metadataProvider)
+    }
+
+    /// The handler factory that both `bootstrapWithLogSmith` overloads install.
+    ///
+    /// It is kept apart from the bootstrap itself so that what the bootstrap options do to a handler can be tested
+    /// through `Logger(label:factory:)`: `LoggingSystem.bootstrap` traps on a second call per process, so a test
+    /// cannot run it.
+    ///
+    /// - Parameters:
+    ///   - manager: The manager to deliver to, or `nil` for the shared `LogSmith` pipeline.
+    ///   - defaultLogLevel: The initial `logLevel` of every handler.
+    ///   - includesSwiftLogContextInMetadata: Whether each handler copies the logger label and source into the flat metadata.
+    /// - Returns: A factory that takes the label of the `Logger` and the metadata provider the bootstrap was given.
+    internal static func logSmithHandlerFactory(manager: LogManager?,
+                                                defaultLogLevel: Logger.Level,
+                                                includesSwiftLogContextInMetadata: Bool) -> @Sendable (String, Logger.MetadataProvider?) -> any LogHandler {
+        return { label, provider in
+            guard let manager else {
+                return LogSmithLogHandler(label: label,
+                                          logLevel: defaultLogLevel,
+                                          metadataProvider: provider,
+                                          includesSwiftLogContextInMetadata: includesSwiftLogContextInMetadata)
+            }
+            return LogSmithLogHandler(label: label,
+                                      manager: manager,
+                                      logLevel: defaultLogLevel,
+                                      metadataProvider: provider,
+                                      includesSwiftLogContextInMetadata: includesSwiftLogContextInMetadata)
+        }
     }
 }
