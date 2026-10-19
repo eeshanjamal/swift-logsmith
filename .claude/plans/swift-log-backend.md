@@ -90,17 +90,18 @@ because `DDLogFlag` has only five flags; `LogType`'s nine cases don't force that
 | `.error` | `.error` |
 | `.critical` | `.critical` |
 
-### Known sharp edge: LogType ordering inversion
+### Former sharp edge: `LogType` ordering inversion — fixed in 2.0.0
 
-`LogType`'s raw values order `notice(1) < info(2) < debug(3) < trace(4)` — the **reverse** of
+Up to 1.1.0, `LogType`'s raw values ordered `notice(1) < info(2) < debug(3) < trace(4)` — the **reverse** of
 swift-log's `trace < debug < info < notice`. Since `LogManager` filters with
-`logType.rawValue >= minimum`, calling `setMinimumLogType(.info)` silently drops swift-log
+`logType.rawValue >= minimum`, calling `setMinimumLogType(.info)` silently dropped swift-log
 `.notice` messages.
 
-Mitigation: the handler defaults `logLevel` to `.trace` so swift-log's own (correctly ordered)
-comparison does the gating. **Filtering for bridged loggers belongs on `logger.logLevel` or
-`bootstrapWithLogSmith(defaultLogLevel:)`**, with LogSmith's own minimums left at their permissive
-defaults. Not fixing the ordering itself — that would be a breaking change.
+The first version of the bridge only worked around it: the handler defaults `logLevel` to `.trace` so swift-log's
+own (correctly ordered) comparison does the gating, and the documentation told users to filter bridged loggers on
+`logger.logLevel` or `bootstrapWithLogSmith(defaultLogLevel:)` and leave LogSmith's minimums alone. The raw values
+now follow severity, so there is nothing left to work around. See "`LogType` and `LogLevel` are ordered by
+severity" under "Found during pre-merge testing".
 
 ---
 
@@ -197,7 +198,6 @@ Decisions, not omissions.
 | **Synchronous / flush logging** | CocoaLumberjack's `loggingSynchronousAsOf: .error` logs at or above a threshold synchronously so errors reach disk before a crash. SwiftLogSmith has no synchronous path at all — `FileLoggerManager.write` is fire-and-forget with no flush API. A real gap, but orthogonal to swift-log and a larger change to the core. |
 | **Rich core metadata** (`[String: String]` → structured) | Would break dictionary-literal ergonomics: swift-log keeps `["k": "v"]` compiling because `MetadataValue` is an *enum* conforming to `ExpressibleByStringLiteral`, which isn't ObjC-representable. An existential `any LogMetadataValue` cannot be expressed by a literal, so every call site would regress. Also breaks all nine `LogSmith.log*` statics plus `LogFormatter.addMetadataPart`'s closure type. Legitimate as its own major version, decided on core-library merit — not as a prerequisite for the bridge. |
 | **`SwiftLogDestination: ILogger`** (LogSmith → swift-log) | The reverse direction. Would let `LogSmith.logE` reach existing swift-log handlers, but does not capture logs from libraries using swift-log, which is the actual goal here. |
-| **Fixing the `LogType` ordering inversion** | Breaking change to public raw values. Documented and mitigated instead — see above. |
 
 ---
 
@@ -242,8 +242,8 @@ Written after the checklists above were ticked; where they disagree, this sectio
 
 `fileId` and `function` now take `String` on `LogManager.log` and on all nine `LogSmith.log*` statics (they were
 `StaticString`), and `LogManager.log` gained `payload:`. `swift package diagnose-api-breaking-changes v1.1.0
---products SwiftLogSmith` reports 19 changes: the removed `LogManager.log` signature plus 2 parameter-type changes
-on each of the nine statics.
+--products SwiftLogSmith` reports 19 changes for this part: the removed `LogManager.log` signature plus 2
+parameter-type changes on each of the nine statics.
 
 Defaults, `#fileID`/`#function` literals and string literals keep compiling, so most callers cannot tell. What breaks
 is forwarding a `StaticString`: the documentation for every static says a wrapper author *should* pass the caller's
@@ -274,6 +274,94 @@ entries can be deleted.
 not representable and `@objcMembers` omits such members silently — so no Objective-C caller can be broken. They are
 now visible (`+[LogSmith logE:metadata:fileId:function:line:completion:]` and so on); Objective-C has no default
 arguments, so callers pass file, function and line explicitly.
+
+### `LogType` and `LogLevel` are ordered by severity — the raw values changed
+
+`LogManager` admits a message only if `logType.logLevel.rawValue >= minLogLevel.rawValue` **and**
+`logType.rawValue >= minLogType.rawValue` (once manager-wide, once per logger). That is a severity filter only if
+the raw values rise with severity, and for four `LogType` cases and two `LogLevel` cases they did not. `LogType` ran
+`notice < info < debug < trace` at the low end, and `LogLevel` ran `default, info, debug, error, fault` (the order of
+`OSLogType`'s constants), so `setMinimumLogType(.info)` silently dropped `.notice` and `setMinimumLogLevel(.debug)`
+let warnings through while dropping info. The existing suite passes on either ordering — nothing in it discriminates
+— which is how this went unnoticed.
+
+Decision: **change the raw values**, so that one `>=` on the raw value stays the whole rule, rather than add a
+parallel severity rank for the filter to use. 2.0.0 is a major release anyway, so the break costs nothing extra.
+
+| | 1.1.0 | now |
+|---|---|---|
+| `LogType` | `notice` 1, `info` 2, `debug` 3, `trace` 4 | `trace` 1, `debug` 2, `info` 3, `notice` 4 |
+| `LogLevel` | `undefined` −1, `default` 0, `info` 1, `debug` 2 | `all` 0, `debug` 1, `info` 2 |
+
+Everything else keeps its value: `LogType` `undefined` −1, `none` 0, `warning` 5, `error` 6, `fault` 7, `critical` 8,
+and `LogLevel` `error` 3, `fault` 4. The roll-up `LogType.logLevel` is now:
+
+| `LogType` | `LogLevel` |
+|---|---|
+| `undefined`, `none` | `all` |
+| `trace`, `debug` | `debug` |
+| `info`, `notice` | `info` |
+| `warning`, `error` | `error` |
+| `fault`, `critical` | `fault` |
+
+- **`LogLevel.default` is renamed `all`** and keeps raw value 0. Used as a minimum it never meant a level of its own,
+  it meant "no minimum", which `all` says; it is also the level of logs that carry no severity. `all` is the usual
+  name for the lowest threshold (`Level.ALL` in Log4j and java.util.logging), whereas `none` or `off` usually means
+  the opposite: nothing passes.
+- **`LogLevel.undefined` is removed.** Every log has a level, so there is nothing for it to describe;
+  `LogType.undefined` and `.none` roll up to `.all`.
+- **`LogType.notice` maps to `.info`** (it was `.default`). That keeps the roll-up monotone — the level never goes
+  down as severity goes up, pinned by `testLogLevel_AsSeverityRises_ShouldNeverGoDown` — so a `LogLevel` minimum
+  cuts at one of the same points as a `LogType` minimum, only more coarsely.
+
+What a minimum now delivers. `warning`+ is `warning`, `error`, `fault` and `critical`; "and above" means every type
+at least that severe in the order `trace < debug < info < notice < warning < error < fault < critical`.
+
+| minimum | 1.1.0 | now |
+|---|---|---|
+| type `.trace` | `trace`, `warning`+ | `trace` and above |
+| type `.debug` | `debug`, `trace`, `warning`+ | `debug` and above |
+| type `.info` | `info`, `debug`, `trace`, `warning`+ | `info` and above |
+| type `.notice` | `notice`, `info`, `debug`, `trace`, `warning`+ | `notice` and above |
+| level `.debug` | `trace`, `debug`, `warning`+ | `trace` and above |
+| level `.info` | `trace`, `debug`, `info`, `warning`+ | `info` and above |
+
+Unchanged: the default minimums, type `.warning`/`.error`/`.fault`/`.critical` and level `.error`/`.fault`. A log of
+type `.undefined` is still dropped by default, because it sorts below `.none`, the default type minimum. Delivering
+one used to need all four minimums (manager and default logger, level and type) lowered, since its level was
+`LogLevel.undefined`; now only the two type minimums need `.undefined`.
+
+**`UserDefaults` overrides.** The per-manager and per-logger override keys are a runtime knob that the library only
+reads; it never writes a raw value, so there is nothing to migrate. A value set by hand keeps its number, which now
+names a different case for four types (`1` was `notice`, is now `trace`). The four reads did `LogType(rawValue:)!` and
+`LogLevel(rawValue:)!`, which trap on a number that is not a case (observed with `99`: signal code 4) — independent of
+this change, but the numbers just moved, and `LogLevel`'s `-1` stopped being a case. They now ignore such a value
+and use the configured minimum.
+
+**Objective-C.** `LogLevelDefault` is now `LogLevelAll` and `LogLevelUndefined` is gone. `LogTypeTrace`/`Debug`/
+`Info`/`Notice` and `LogLevelInfo`/`Debug` keep their names but change value, so Objective-C code that stored or
+compared the integers has to be reviewed; code that uses the constants just recompiles.
+
+**API check.** `swift-api-digester` reports the added and removed `LogLevel` cases (3 more allowlist entries, 22 in
+total) but not changed raw values, so CI cannot catch them. `LogThresholdTests` pins them instead — the raw values,
+the roll-up, every minimum and the override handling, each against an order written out by hand — and the release
+notes must call them out.
+
+**Bridge.** swift-log's seven levels map 1:1 onto `LogType`, and both sides now order severity the same way, so the
+effective threshold of a bridged logger is simply the stricter of its `logLevel` and the LogSmith minimums. The
+handler documentation and the README no longer warn about an inversion. Filtering on `logLevel` /
+`defaultLogLevel` is still the better place, but because it is cheaper (swift-log skips the call, so the payload and
+metadata are never built), not because it avoids a trap. `defaultLogLevel` still defaults to `.trace`.
+
+**Release notes (2.0.0)**, alongside the `StaticString` → `String` migration above:
+
+- `LogType` raw values changed: `trace` 1, `debug` 2, `info` 3, `notice` 4. `LogLevel` raw values changed: `debug` 1,
+  `info` 2. Both now increase with severity.
+- `LogLevel.default` is renamed `LogLevel.all`; `LogLevel.undefined` is removed (`LogType.undefined` and `.none` map to
+  `.all`); `LogType.notice` now maps to `LogLevel.info`.
+- Minimums are now severity thresholds (the table above). Code that set type `.trace`/`.debug`/`.info`/`.notice` or
+  level `.debug`/`.info` will see different logs.
+- A `UserDefaults` override that is not a valid raw value is ignored instead of crashing.
 
 ### The bridge entry point is `LogSmith.logInternal`, package-scoped
 
