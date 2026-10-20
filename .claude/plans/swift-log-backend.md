@@ -196,7 +196,7 @@ Decisions, not omissions.
 | Item | Why deferred |
 |---|---|
 | **Synchronous / flush logging** | CocoaLumberjack's `loggingSynchronousAsOf: .error` logs at or above a threshold synchronously so errors reach disk before a crash. SwiftLogSmith has no synchronous path at all — `FileLoggerManager.write` is fire-and-forget with no flush API. A real gap, but orthogonal to swift-log and a larger change to the core. |
-| **Rich core metadata** (`[String: String]` → structured) | Would break dictionary-literal ergonomics: swift-log keeps `["k": "v"]` compiling because `MetadataValue` is an *enum* conforming to `ExpressibleByStringLiteral`, which isn't ObjC-representable. An existential `any LogMetadataValue` cannot be expressed by a literal, so every call site would regress. Also breaks all nine `LogSmith.log*` statics plus `LogFormatter.addMetadataPart`'s closure type. Legitimate as its own major version, decided on core-library merit — not as a prerequisite for the bridge. |
+| **Rich core metadata** (`[String: String]` → structured) | Would break dictionary-literal ergonomics: swift-log keeps `["k": "v"]` compiling because `MetadataValue` is an *enum* conforming to `ExpressibleByStringLiteral`, which isn't ObjC-representable. An existential `any LogMetadataValue` cannot be expressed by a literal, so every call site would regress. Also breaks all nine `LogSmith.log*` statics plus `LogFormatter.addMetadataPart`'s closure type. Legitimate as its own major version, decided on core-library merit — not as a prerequisite for the bridge. When it lands, lift the nested collapse in `LogSmithLogHandler.flatten`; see "Metadata: a sorted default, and nested values collapsed per top-level key". |
 | **`SwiftLogDestination: ILogger`** (LogSmith → swift-log) | The reverse direction. Would let `LogSmith.logE` reach existing swift-log handlers, but does not capture logs from libraries using swift-log, which is the actual goal here. |
 
 ---
@@ -362,6 +362,82 @@ metadata are never built), not because it avoids a trap. `defaultLogLevel` still
 - Minimums are now severity thresholds (the table above). Code that set type `.trace`/`.debug`/`.info`/`.notice` or
   level `.debug`/`.info` will see different logs.
 - A `UserDefaults` override that is not a valid raw value is ignored instead of crashing.
+
+### Metadata: a sorted default, and nested values collapsed per top-level key
+
+The README's swift-log example showed `"user": "[\"id\": \"7\"]"`, and a review comment asked whether the backslashes
+were real. They were, and two separate things produced them:
+
+- The bridge flattened a nested value with swift-log's own `MetadataValue.description`, which for a dictionary is
+  `dict.mapValues { $0.description }.description`. It sorts nothing at any level, and from the second level down it
+  escapes the quotes of the level below, because the inner string is a dictionary value of the outer one. Array
+  items came out quoted.
+- `LogFormatter.default` printed the whole `[String: String]` with `"\(metadata)"` (unchanged since 1.1.0). Swift's
+  dictionary description escapes any quote or backslash inside a value and iterates in a different key order on every
+  run. First-party values hit the same thing: a JSON value `{"a":1}` printed as `["body": "{\"a\":1}"]`.
+
+Decisions:
+
+1. **Default format: the same text as before, sorted by key** (`["code": "404", "user": "[id=7]"]`). It is built from
+   `String(reflecting:)`, the call the standard library uses for each key and value of a dictionary description, so
+   the escaping is identical (compared with the standard library over 225 key/value pairs) and only the order is
+   stable now. `"\(dictionary)"` itself cannot be sorted, and `"\(dictionary.sorted { … })"` prints an array of
+   labelled tuples. The closure is inline on the public `Builder.addMetadataPart`. The three private `LogPart`
+   classes take every argument explicitly: they are only ever built by the Builder, which passes everything, so
+   their own defaults were dead code and a second copy of this closure.
+2. **Bridge: every top-level key stays an entry of its own; a nested dictionary or array collapses into the string
+   value of its key.** `LogMessage.metadata` keeps the core's flat contract, and a metadata format still applies to
+   each entry. The collapsed string is `[key=value, key=value]`, sorted by key at every depth, with arrays as
+   `[item, item]` in their own order and nothing quoted, so the default formatter has nothing to escape when it
+   prints it as a value. `description` is not used. `SwiftLogPayload.resolvedMetadata` still carries the untouched
+   tree. For example `code: 404, tags: [a, b], user: {id: 7, address: {city: X, zip: 1}}` arrives as
+   `["code": "404", "tags": "[a, b]", "user": "[address=[city=X, zip=1], id=7]"]`.
+
+Tried and dropped on the way:
+
+- **A `[key=value, …]` default in the formatter.** It changed every user's log line, and it could not help the second
+  level anyway: the formatter only receives strings, so a string already built with escapes and a random order is
+  beyond it.
+- **Rendering the whole line's worth of metadata in the bridge, top level included.** Presentation would then be
+  decided before a metadata format ever saw it, so a custom `addMetadataPart(format:)` could not restyle or filter
+  anything. Only the nested part is collapsed; the top level stays entries.
+- **Dotted keys** (`user.address.city`, `tags.0`). This is the formatter-neutral answer: every leaf becomes an entry,
+  so a custom format can restyle, filter or redact nested keys (a format that hides keys containing "password" works
+  on `user.password`, but cannot see inside `user=[…, password=…]`). Not taken because the `user` entry disappears
+  from the metadata and the keys would change again once core metadata can nest; the collapse keeps the top-level
+  keys stable and lives in one function.
+
+Accepted limitation: a metadata format sees a nested value as one string and cannot restyle or filter inside it.
+Loggers that need the structure read `SwiftLogPayload.resolvedMetadata`. A value that itself contains `", "` or
+`"="` is ambiguous inside the unquoted string. Values with quotes are escaped as in any dictionary description, as
+they were in 1.1.0.
+
+**Lifting it later.** When core metadata can nest (see "Deliberately deferred"), stop collapsing:
+`LogSmithLogHandler.flatten` passes the nested values through and keeps the keys. The top-level keys do not change,
+so `metadata["user"]` keeps working and only the type of its value does.
+
+**Cost** (release build, one Intel Mac, medians). `flatten` runs on the caller's thread, once for every statement that
+passes swift-log's level check; a statement below the logger's `logLevel` never reaches it. Flat metadata costs what
+swift-log's `description` cost (about 250 ns for 5 entries). Nested metadata is about twice as fast (the two-level
+README example: 2.2 µs against 5.0 µs). The whole bridge call on the caller's thread is 5.3 µs with 5 flat entries
+and 9.1 µs with the two-level example, so `flatten` is about 5% of it for flat metadata and 16–32% for nested. A
+variant that renders into one output buffer was 22–32% faster on nested metadata, which is 5–10% of the whole call;
+not adopted.
+
+Tests. Default format: the sort order, empty metadata, the same text as printing the dictionary for single-entry
+dictionaries holding quotes, backslashes, newlines and emoji, and independence from insertion order (the same 30
+entries inserted in opposite orders). Bridge: the agreed shape (top-level keys kept, nested collapsed), second-level
+and mixed nesting, empty containers and convertible values, insertion-order independence of nested dictionaries, a
+custom `addMetadataPart(format:)` restyling each top-level entry and seeing a nested value as one string, and two
+whole lines through the default formatter (the README example and a second-level one, asserting that no backslash
+appears). Restoring `"\(metadata)"`, dropping the sort, the brackets or the space, not escaping, sorting descending,
+going back to `description`, not recursing, quoting nested values, sorting arrays, collapsing the whole top level,
+dropping nested values, or switching to dotted keys each fails at least one of them.
+
+Release note (2.0.0): the default metadata text is unchanged apart from being sorted by key; it used to vary from run
+to run. Nested swift-log metadata arrives in `LogMessage.metadata` as one unquoted `[key=value]` string per
+top-level key, where it used to be swift-log's `description`; the original stays on
+`SwiftLogPayload.resolvedMetadata`.
 
 ### The bridge entry point is `LogSmith.logInternal`, package-scoped
 
