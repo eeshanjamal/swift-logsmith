@@ -199,7 +199,7 @@ final class LogSmithTests: XCTestCase {
     }
 
     func testLogSmithLogE_ShouldPopulateInternalTagsFromCallSite() {
-        // Arrange — the logX statics capture StaticStrings and hand them on as Strings; the text must survive intact.
+        // Arrange — the logX statics take the call site as Strings (`#fileID` and `#function` by default); the text must survive intact.
         let logger = mockLogger!
         let expectedFile = "\(#fileID)"
         let expectedFunction = "\(#function)"
