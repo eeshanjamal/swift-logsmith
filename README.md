@@ -165,12 +165,12 @@ let logger = Logger(label: "com.demo.net")
 logger.error("Request failed", metadata: ["user": ["id": "7"], "code": "404"])
 
 // Expected Output (via OSLogger and FileLogger):
-// [E] Request failed ["label": "com.demo.net", "source": "MyApp", "code": "404", "user": "[\"id\": \"7\"]"]
+// [E] Request failed ["code": "404", "label": "com.demo.net", "source": "MyApp", "user": "[id=7]"]
 ```
 
 `swift-log` metadata is a tree, while `LogMessage.metadata` is a flat `[String: String]`. Both are populated:
-a readable rendering lands in `metadata` so the default formatter shows it immediately, and the untouched
-original travels in a `SwiftLogPayload`:
+a readable rendering lands in `metadata` so the default formatter shows it immediately (each top-level key stays its
+own entry, and a nested value becomes one string), and the untouched original travels in a `SwiftLogPayload`:
 
 ```swift
 final class MyLogger: ILogger {

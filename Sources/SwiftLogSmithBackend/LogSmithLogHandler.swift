@@ -38,8 +38,9 @@ public import SwiftLogSmith
 /// skips the call entirely and the payload and metadata are never built for a message that would be dropped later.
 ///
 /// **Structured metadata.** `swift-log` metadata is a tree, while `LogMessage.metadata` is a
-/// flat `[String: String]`. The handler populates both: a stringified rendering lands in `metadata` so the
-/// default formatter shows it with no configuration, and the untouched original travels in a
+/// flat `[String: String]`. The handler populates both: a readable rendering lands in `metadata` so the
+/// default formatter shows it with no configuration (each top-level key stays an entry; a nested value becomes one
+/// string, written as `[key=value, key=value]` sorted by key), and the untouched original travels in a
 /// ``SwiftLogPayload`` on `LogMessage.payload`.
 public struct LogSmithLogHandler: LogHandler {
 
@@ -213,10 +214,35 @@ public struct LogSmithLogHandler: LogHandler {
 
     /// Renders structured metadata into SwiftLogSmith's flat `[String: String]` form.
     ///
-    /// Nested dictionaries and arrays are rendered through `Logger.MetadataValue`'s own `description`, so a
-    /// value of `.dictionary(["id": "7"])` becomes the string `["id": "7"]`. They remain readable but stop
-    /// being traversable; the untouched original is preserved on ``SwiftLogPayload/resolvedMetadata``.
+    /// Every top-level key stays an entry of its own, so a metadata format (`addMetadataPart(format:)`) applies to it
+    /// as it does to any other metadata. A nested dictionary or array cannot be an entry of its own while
+    /// `LogMessage.metadata` is flat, so it is collapsed into the string value of its top-level key. That string is
+    /// written the same way at every depth: a dictionary as `[key=value, key=value]`, sorted by key, and an array as
+    /// `[item, item]` in its own order. Nothing inside it is quoted, so there is nothing for a formatter that prints
+    /// values as quoted strings, like the default one, to escape. So
+    /// `"user": .dictionary(["id": "7", "address": .dictionary(["city": "X"])])` becomes the entry
+    /// `"user": "[address=[city=X], id=7]"`. `Logger.MetadataValue`'s own `description` is not used: it sorts nothing
+    /// and, from the second level down, escapes the quotes of the level below it.
+    ///
+    /// A metadata format sees such a string as one value, so it cannot restyle or filter what is inside it; the
+    /// untouched original is preserved on ``SwiftLogPayload/resolvedMetadata`` for loggers that need the structure.
+    /// This collapse is the part to lift once core metadata can nest: pass the nested values through and keep the keys.
     internal static func flatten(_ metadata: Logger.Metadata) -> [String: String] {
-        return metadata.mapValues { $0.description }
+        return metadata.mapValues { render($0) }
+    }
+
+    /// Renders one metadata value, recursing into dictionaries and arrays. See `flatten(_:)`.
+    private static func render(_ value: Logger.MetadataValue) -> String {
+        switch value {
+        case .string(let string):
+            return string
+        case .stringConvertible(let convertible):
+            return convertible.description
+        case .dictionary(let dictionary):
+            let entries = dictionary.sorted { $0.key < $1.key }.map { "\($0.key)=\(render($0.value))" }
+            return "[\(entries.joined(separator: ", "))]"
+        case .array(let array):
+            return "[\(array.map { render($0) }.joined(separator: ", "))]"
+        }
     }
 }

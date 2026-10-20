@@ -187,10 +187,91 @@ final class LogSmithLogHandlerTests: XCTestCase {
         // Act
         let flattened = LogSmithLogHandler.flatten(metadata)
 
-        // Assert — nested values are rendered via Logger.MetadataValue's own description.
+        // Assert — nested values are written in the default formatter's style: no quotes, dictionaries sorted by key.
         XCTAssertEqual(flattened["plain"], "value")
-        XCTAssertEqual(flattened["nested"], #"["id": "7"]"#)
-        XCTAssertEqual(flattened["list"], #"["a", "b"]"#)
+        XCTAssertEqual(flattened["nested"], "[id=7]")
+        XCTAssertEqual(flattened["list"], "[a, b]")
+    }
+
+    func testFlatten_ShouldKeepEveryTopLevelKeyAndCollapseOnlyNestedValues() {
+        // Arrange
+        let metadata: Logger.Metadata = [
+            "code": "404",
+            "tags": ["a", "b"],
+            "user": ["id": "7", "name": "Ann", "role": "admin", "address": ["zip": "1", "city": "X"]]
+        ]
+
+        // Act
+        let flattened = LogSmithLogHandler.flatten(metadata)
+
+        // Assert — the top level is still key/value, as core metadata supports it; only the nested values become strings.
+        XCTAssertEqual(flattened, [
+            "code": "404",
+            "tags": "[a, b]",
+            "user": "[address=[city=X, zip=1], id=7, name=Ann, role=admin]"
+        ])
+    }
+
+    func testFlatten_WithSecondLevelNesting_ShouldSortEveryLevelWithoutEscaping() {
+        // Arrange — three levels of dictionaries, each with its keys out of order.
+        let metadata: Logger.Metadata = [
+            "user": ["id": "7", "name": "Ann", "address": ["zip": "1", "city": "X", "geo": ["lng": "2", "lat": "1"]]]
+        ]
+
+        // Act
+        let flattened = LogSmithLogHandler.flatten(metadata)
+
+        // Assert — no backslashes at any depth, and every level sorted.
+        XCTAssertEqual(flattened["user"], "[address=[city=X, geo=[lat=1, lng=2], zip=1], id=7, name=Ann]")
+    }
+
+    func testFlatten_WithArraysAndDictionariesInsideEachOther_ShouldRenderEveryLevelTheSameWay() {
+        // Arrange
+        let metadata: Logger.Metadata = [
+            "mixed": .array([.dictionary(["b": "2", "a": "1"]), .string("x"), .array([.string("y"), .string("z")])]),
+            "box": .dictionary(["tags": .array([.string("t2"), .string("t1")]), "id": "7"])
+        ]
+
+        // Act
+        let flattened = LogSmithLogHandler.flatten(metadata)
+
+        // Assert — dictionaries are sorted by key, arrays keep their own order.
+        XCTAssertEqual(flattened["mixed"], "[[a=1, b=2], x, [y, z]]")
+        XCTAssertEqual(flattened["box"], "[id=7, tags=[t2, t1]]")
+    }
+
+    func testFlatten_WithEmptyContainersAndConvertibleValues_ShouldRenderThem() {
+        // Arrange
+        let metadata: Logger.Metadata = [
+            "emptyDictionary": .dictionary([:]),
+            "emptyArray": .array([]),
+            "number": .stringConvertible(42),
+            "inside": .dictionary(["ratio": .stringConvertible(1.5)])
+        ]
+
+        // Act
+        let flattened = LogSmithLogHandler.flatten(metadata)
+
+        // Assert
+        XCTAssertEqual(flattened["emptyDictionary"], "[]")
+        XCTAssertEqual(flattened["emptyArray"], "[]")
+        XCTAssertEqual(flattened["number"], "42")
+        XCTAssertEqual(flattened["inside"], "[ratio=1.5]")
+    }
+
+    func testFlatten_WithNestedEntriesInsertedInDifferentOrders_ShouldRenderTheSame() {
+        // Arrange — the same entries added in opposite orders, which a plain dictionary may iterate differently.
+        let keys = (0..<30).map { "key\($0)" }
+        func nested(insertingIn order: [String]) -> Logger.Metadata {
+            var inner: Logger.Metadata = [:]
+            order.forEach { inner[$0] = .dictionary([$0: .string($0.uppercased())]) }
+            return ["outer": .dictionary(inner)]
+        }
+        let expected = "[" + keys.sorted().map { "\($0)=[\($0)=\($0.uppercased())]" }.joined(separator: ", ") + "]"
+
+        // Act & Assert
+        XCTAssertEqual(LogSmithLogHandler.flatten(nested(insertingIn: keys))["outer"], expected)
+        XCTAssertEqual(LogSmithLogHandler.flatten(nested(insertingIn: keys.reversed()))["outer"], expected)
     }
 
     func testLog_WithNestedMetadata_ShouldPopulateFlatMetadataOnLogMessage() {
@@ -200,7 +281,7 @@ final class LogSmithLogHandlerTests: XCTestCase {
         }
 
         // Assert
-        XCTAssertEqual(mockLogger.lastLogMessage?.metadata["user"], #"["id": "7"]"#)
+        XCTAssertEqual(mockLogger.lastLogMessage?.metadata["user"], "[id=7]")
     }
 
     func testLog_WithHandlerMetadataAndNoPerStatementMetadata_ShouldDeliverHandlerMetadata() {
@@ -284,6 +365,52 @@ final class LogSmithLogHandlerTests: XCTestCase {
         // The symbolic "[E]" tag is registered by LogSmith's own initialiser, so it is deliberately absent
         // on an isolated LogManager. See SharedPipelineConcurrencyTests for the shared-pipeline behaviour.
         XCTAssertFalse(formatted.contains("[E]"), formatted)
+    }
+
+    func testLog_WithNestedMetadata_ShouldRenderTheReadmeExampleThroughDefaultFormatter() {
+        // Arrange & Act — the logger call from the README's swift-log section. An isolated manager adds no tags,
+        // so the whole formatted line can be compared.
+        logAndWait { logger in
+            logger.error("Request failed", metadata: ["user": ["id": "7"], "code": "404"], source: "MyApp")
+        }
+
+        // Assert — keys sorted, the nested value kept as one string.
+        XCTAssertEqual(mockLogger.lastFormattedMessage,
+                       #"Request failed ["code": "404", "label": "com.swiftlogsmith.tests", "source": "MyApp", "user": "[id=7]"]"#)
+    }
+
+    func testLog_WithCustomMetadataFormat_ShouldFormatEveryTopLevelEntryAndSeeANestedValueAsOneString() {
+        // Arrange — a metadata format that restyles every entry it is given.
+        mockLogger.formatter = LogFormatter.Builder()
+            .addMessagePart()
+            .addMetadataPart(prefix: " ", format: { metadata in
+                metadata.sorted { $0.key < $1.key }.map { "\($0.key.uppercased()):\($0.value)" }.joined(separator: "; ")
+            })
+            .build()
+
+        // Act
+        logAndWait(logger: makeLogger(includesContext: false)) { logger in
+            logger.error("Request failed",
+                         metadata: ["code": "404", "tags": ["a", "b"], "user": ["id": "7", "address": ["zip": "1", "city": "X"]]])
+        }
+
+        // Assert — each top-level key is restyled; a nested value reaches the format as the one string it was collapsed into.
+        XCTAssertEqual(mockLogger.lastFormattedMessage, "Request failed CODE:404; TAGS:[a, b]; USER:[address=[city=X, zip=1], id=7]")
+    }
+
+    func testLog_WithSecondLevelNesting_ShouldRenderOneSortedLineWithoutBackslashes() {
+        // Arrange & Act
+        logAndWait { logger in
+            logger.error("Request failed",
+                         metadata: ["user": ["id": "7", "name": "Ann", "address": ["zip": "1", "city": "X"]], "tags": ["a", "b"]],
+                         source: "MyApp")
+        }
+
+        // Assert — the second level is sorted too, and nothing in the line is escaped.
+        let formatted = mockLogger.lastFormattedMessage ?? ""
+        XCTAssertEqual(formatted,
+                       #"Request failed ["label": "com.swiftlogsmith.tests", "source": "MyApp", "tags": "[a, b]", "user": "[address=[city=X, zip=1], id=7, name=Ann]"]"#)
+        XCTAssertFalse(formatted.contains("\\"), formatted)
     }
 
     //MARK: Payload
