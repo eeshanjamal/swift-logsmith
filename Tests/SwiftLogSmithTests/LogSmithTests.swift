@@ -198,6 +198,84 @@ final class LogSmithTests: XCTestCase {
         }
     }
 
+    /// One call per logging static, each handing `payload` over, together with the type it should arrive as.
+    private func logCalls(payload: (any LogPayload)?) -> [(type: LogType, call: (@escaping @Sendable (Bool) -> Void) -> Void)] {
+        [
+            (.none,     { LogSmith.log("Sample", payload: payload, completion: $0) }),
+            (.trace,    { LogSmith.logT("Sample", payload: payload, completion: $0) }),
+            (.debug,    { LogSmith.logD("Sample", payload: payload, completion: $0) }),
+            (.notice,   { LogSmith.logN("Sample", payload: payload, completion: $0) }),
+            (.info,     { LogSmith.logI("Sample", payload: payload, completion: $0) }),
+            (.warning,  { LogSmith.logW("Sample", payload: payload, completion: $0) }),
+            (.error,    { LogSmith.logE("Sample", payload: payload, completion: $0) }),
+            (.critical, { LogSmith.logC("Sample", payload: payload, completion: $0) }),
+            (.fault,    { LogSmith.logF("Sample", payload: payload, completion: $0) })
+        ]
+    }
+
+    func testLogSmithStatics_WithPayload_ShouldDeliverTheSameInstanceForEveryType() {
+        // Arrange
+        let logger = mockLogger!
+        let payload = TestLogPayload(id: 5)
+        let calls = logCalls(payload: payload)
+
+        // Act & Assert
+        expectCompletion(description: "Every static should deliver the payload it was given", fulfillmentCount: calls.count) { fulfill in
+            calls.forEach { item in
+                let type = item.type
+                item.call { _ in
+                    let message = logger.lastLogMessage(for: type)
+                    XCTAssertNotNil(message, "\(type) should have been delivered")
+                    XCTAssertTrue(message?.payload === payload, "\(type) should deliver the same payload instance")
+                    fulfill()
+                }
+            }
+        }
+    }
+
+    func testLogSmithStatics_WithoutPayload_ShouldDeliverNoPayloadForEveryType() {
+        // Arrange
+        let logger = mockLogger!
+        let calls = logCalls(payload: nil)
+
+        // Act & Assert
+        expectCompletion(description: "No static should invent a payload", fulfillmentCount: calls.count) { fulfill in
+            calls.forEach { item in
+                let type = item.type
+                item.call { _ in
+                    let message = logger.lastLogMessage(for: type)
+                    XCTAssertNotNil(message, "\(type) should have been delivered")
+                    XCTAssertNil(message?.payload, "\(type) should deliver no payload")
+                    fulfill()
+                }
+            }
+        }
+    }
+
+    func testLogSmithLogI_WithPayloadMetadataAndExplicitSourceLocation_ShouldDeliverAllOfThem() {
+        // Arrange
+        let logger = mockLogger!
+        let payload = TestLogPayload(id: 21)
+        LogSmith.addTag(InternalTag(internalTagType: .file))
+        LogSmith.addTag(InternalTag(internalTagType: .function))
+        LogSmith.addTag(InternalTag(internalTagType: .line))
+
+        // Act & Assert
+        expectCompletion(description: "Payload, metadata and source location should all arrive") { fulfill in
+            LogSmith.logI("located", metadata: ["k": "v"], payload: payload, fileId: "Module/File.swift", function: "doWork()", line: 42) { _ in
+                let message = logger.lastLogMessage(for: .info)
+                XCTAssertTrue(message?.payload === payload, "The payload should arrive as the same instance")
+                XCTAssertEqual(message?.metadata, ["k": "v"])
+
+                let tags = message?.tags ?? []
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.file })?.value, "Module/File.swift")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.function })?.value, "doWork()")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.line })?.value, "42")
+                fulfill()
+            }
+        }
+    }
+
     func testLogSmithLogE_ShouldPopulateInternalTagsFromCallSite() {
         // Arrange — the logX statics take the call site as Strings (`#fileID` and `#function` by default); the text must survive intact.
         let logger = mockLogger!

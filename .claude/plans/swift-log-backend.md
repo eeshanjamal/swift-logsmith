@@ -241,9 +241,9 @@ Written after the checklists above were ticked; where they disagree, this sectio
 ### `fileId`/`function` are `String` everywhere — a source-breaking change
 
 `fileId` and `function` now take `String` on `LogManager.log` and on all nine `LogSmith.log*` statics (they were
-`StaticString`), and `LogManager.log` gained `payload:`. `swift package diagnose-api-breaking-changes v1.1.0
---products SwiftLogSmith` reports 19 changes for this part: the removed `LogManager.log` signature plus 2
-parameter-type changes on each of the nine statics.
+`StaticString`), and `LogManager.log` gained `payload:`. The nine statics gained it too (see "The logging statics take
+a payload too"), and `swift package diagnose-api-breaking-changes v1.1.0 --products SwiftLogSmith` reports the two
+changes together, so the allowlist entries for them are described there.
 
 Defaults, `#fileID`/`#function` literals and string literals keep compiling, so most callers cannot tell. What breaks
 is forwarding a `StaticString`: the documentation for every static says a wrapper author *should* pass the caller's
@@ -272,8 +272,8 @@ entries can be deleted.
 
 **Objective-C:** none of `LogManager.log`, `LogSmith.log*` was visible to Objective-C in 1.1.0 — `StaticString` is
 not representable and `@objcMembers` omits such members silently — so no Objective-C caller can be broken. They are
-now visible (`+[LogSmith logE:metadata:fileId:function:line:completion:]` and so on); Objective-C has no default
-arguments, so callers pass file, function and line explicitly.
+now visible (`+[LogSmith logE:metadata:payload:fileId:function:line:completion:]` and so on); Objective-C has no
+default arguments, so callers pass the payload (`nil` for none), file, function and line explicitly.
 
 ### `LogType` and `LogLevel` are ordered by severity — the raw values changed
 
@@ -342,8 +342,8 @@ and use the configured minimum.
 `Info`/`Notice` and `LogLevelInfo`/`Debug` keep their names but change value, so Objective-C code that stored or
 compared the integers has to be reviewed; code that uses the constants just recompiles.
 
-**API check.** `swift-api-digester` reports the added and removed `LogLevel` cases (3 more allowlist entries, 22 in
-total) but not changed raw values, so CI cannot catch them. `LogThresholdTests` pins them instead — the raw values,
+**API check.** `swift-api-digester` reports the added and removed `LogLevel` cases (3 of the allowlist's 45 entries)
+but not changed raw values, so CI cannot catch them. `LogThresholdTests` pins them instead — the raw values,
 the roll-up, every minimum and the override handling, each against an order written out by hand — and the release
 notes must call them out.
 
@@ -452,6 +452,27 @@ All nine `log*` facades now delegate to it, so the hop onto `LogSmith`'s queue e
 facades and the backend share the exact same path. Its `fileId`/`function`/`line` parameters have no defaults, so
 a caller cannot log its own location by accident. A release-build benchmark shows no difference from the previous
 shape beyond run-to-run noise.
+
+### The logging statics take a payload too
+
+`logInternal` and `LogManager.log` take an optional `payload`, and the nine `LogSmith` statics are the public facade
+over them, so they take it as well: `payload: (any LogPayload)? = nil`, after `metadata` and before the source
+location, the order `logInternal` and `LogManager.log` use. Structured context is then not a bridge-only feature: any
+first-party caller or wrapper can attach a `LogPayload`, and any `ILogger` reads it back with a conditional cast.
+
+Every call that compiled still compiles (the parameter defaults to `nil` and `completion` stays last, so trailing
+closures are unaffected). Objective-C callers, for whom the selectors are new in this release, pass `nil`; the
+generated header shows `payload:(id <LogPayload> _Nullable)` on all nine, and `logInternal` is still absent from it.
+
+The API digester matches each new signature to the old one by position, so inserting a parameter in the middle is
+reported as a rename plus shifted parameter-type changes. The allowlist therefore holds 45 entries: for each of
+`logT` … `logF` four parameter-type changes and one rename (40), `LogSmith.log` removed, `LogManager.log` removed,
+and the 3 `LogLevel` entries. They are mechanical, and are deleted once `v2.0.0` is tagged and becomes the baseline.
+
+Tests: each of the nine statics delivers the very same payload instance and none invents one when it is omitted;
+payload, metadata and an explicit call site arrive together through a facade; and `PublicAPICompileTests` calls the
+statics with a payload from outside the module. Making any single static drop its payload fails a test that names
+the type it logs at.
 
 ### swift-log lower bound is 1.12.0, not 1.11.0
 

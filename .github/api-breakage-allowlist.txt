@@ -1,22 +1,45 @@
-API breakage: func LogSmith.log(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.log(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
+API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
+API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
+API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
+API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
+API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
+API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to Swift.String
+API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
+API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 2 type change from Swift.StaticString to (any SwiftLogSmith.LogPayload)?
 API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 3 type change from Swift.StaticString to Swift.String
-API breakage: func LogManager.log(message:logType:metadata:fileId:function:line:completion:) has been removed
+API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 4 type change from Swift.UInt to Swift.String
+API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has parameter 5 type change from ((Swift.Bool) -> Swift.Void)? to Swift.UInt
 API breakage: enumelement LogLevel.all has been added as a new enum case
-API breakage: enumelement LogLevel.default has been removed
+API breakage: func LogManager.log(message:logType:metadata:fileId:function:line:completion:) has been removed
+API breakage: func LogSmith.log(_:metadata:fileId:function:line:completion:) has been removed
+API breakage: func LogSmith.logT(_:metadata:fileId:function:line:completion:) has been renamed to func logT(_:metadata:payload:fileId:function:line:completion:)
+API breakage: func LogSmith.logD(_:metadata:fileId:function:line:completion:) has been renamed to func logD(_:metadata:payload:fileId:function:line:completion:)
+API breakage: func LogSmith.logN(_:metadata:fileId:function:line:completion:) has been renamed to func logN(_:metadata:payload:fileId:function:line:completion:)
+API breakage: func LogSmith.logI(_:metadata:fileId:function:line:completion:) has been renamed to func logI(_:metadata:payload:fileId:function:line:completion:)
+API breakage: func LogSmith.logW(_:metadata:fileId:function:line:completion:) has been renamed to func logW(_:metadata:payload:fileId:function:line:completion:)
+API breakage: func LogSmith.logE(_:metadata:fileId:function:line:completion:) has been renamed to func logE(_:metadata:payload:fileId:function:line:completion:)
+API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) has been renamed to func logC(_:metadata:payload:fileId:function:line:completion:)
+API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has been renamed to func logF(_:metadata:payload:fileId:function:line:completion:)
 API breakage: enumelement LogLevel.undefined has been removed
+API breakage: enumelement LogLevel.default has been removed

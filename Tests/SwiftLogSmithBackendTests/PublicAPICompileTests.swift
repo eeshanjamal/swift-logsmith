@@ -38,6 +38,9 @@ final class PublicAPICompileTests: XCTestCase {
         }
     }
 
+    /// A payload type written the way an integration would write one.
+    private final class CompilePayload: NSObject, LogPayload {}
+
     func testPublicSurface_ShouldBeReachableWithoutTestableAccess() {
         // README: bootstrap against the shared pipeline, with every option, and against a caller-owned manager.
         let bootstrapShared: () -> Void = {
@@ -71,8 +74,14 @@ final class PublicAPICompileTests: XCTestCase {
             LogSmith.logE("message", fileId: location, function: location, line: 1)
         }
 
+        // Every logging static takes a payload, so an integration can attach structured context without a LogManager.
+        let logWithPayload: (CompilePayload) -> Void = { payload in
+            LogSmith.logE("message", metadata: ["key": "value"], payload: payload)
+            LogSmith.log("message", payload: payload)
+        }
+
         // Referencing the values is enough; none of the closures is ever invoked.
         _ = (bootstrapShared, bootstrapWithOptions, bootstrapIsolated, shared, isolated, metadataKeys, mappedType,
-             PayloadReadingLogger.self, logWithRuntimeLocation)
+             PayloadReadingLogger.self, logWithRuntimeLocation, logWithPayload)
     }
 }

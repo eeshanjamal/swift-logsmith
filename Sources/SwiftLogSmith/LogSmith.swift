@@ -198,12 +198,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func log(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func log(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .none, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a trace message to all active loggers with `LogType.trace`.
@@ -215,12 +216,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logT(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logT(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .trace, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a debug message to all active loggers with `LogType.debug`.
@@ -232,12 +234,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logD(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logD(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .debug, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a notice message to all active loggers with `LogType.notice`.
@@ -249,12 +252,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logN(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logN(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .notice, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs an informative message to all active loggers with `LogType.info`.
@@ -266,12 +270,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logI(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logI(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .info, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a warning message to all active loggers with `LogType.warning`.
@@ -283,12 +288,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logW(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logW(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .warning, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs an error message to all active loggers with `LogType.error`.
@@ -300,12 +306,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logE(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logE(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .error, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a critical message to all active loggers with `LogType.critical`.
@@ -317,12 +324,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logC(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logC(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .critical, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a fault message to all active loggers with `LogType.fault`.
@@ -334,12 +342,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logF(_ message: String, metadata: [String: String] = Dictionary(), fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        logInternal(message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion)
+    public static func logF(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .fault, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
 
     /// Queues a message for the default manager with an explicit ``LogType``, optional structured payload and source information.
