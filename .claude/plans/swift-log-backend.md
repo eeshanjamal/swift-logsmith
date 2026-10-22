@@ -500,30 +500,44 @@ consumer of the backend gets — was never built. CI now has a Swift 6.2 leg (Xc
 
 ## Pre-existing bug found during verification (NOT introduced here, NOT fixed here)
 
-**The first log file of every session is spuriously archived.**
+**The first message of the first session in an empty log directory is spuriously archived.**
 
 `SessionRollingFrequency.shouldRoll` reads `LogSmith.sessionLaunchTime`, but only *after* an early
-`guard let createdAt = logFile.createdAt else { return false }`. On the very first write the file does
-not exist on disk yet, so `createdAt` is `nil` and the guard returns before ever touching
-`sessionLaunchTime`. The static therefore initialises lazily during the **second** write — by which
-point file #1 already predates it, so it is judged stale and rolled.
+`guard let createdAt = logFile.createdAt else { return false }`. `sessionLaunchTime` is a `static let`, so Swift
+initialises it the first time it is read, not when the process starts, and `shouldRoll` is its only reader.
 
-Reproduced with three sequential `LogSmith.logI` calls against a default `FileLoggerManager`:
+When a session starts with no `.log` file on disk, the first write only builds an in-memory `LogFile`
+(`createNewLogFile()` creates nothing on disk). `createdAt` is `nil`, so the guard returns before touching
+`sessionLaunchTime`, and the write then creates file #1 (creation time T1). On the **second** write the file exists,
+so `shouldRoll` reads `sessionLaunchTime` for the first time: it is initialised now (T2 > T1), file #1 is judged to
+predate the session, and it is zipped away.
+
+Reproduced with three writes to a default `FileLoggerManager` in a fresh directory, on `v1.1.0`, on `main` and on this
+branch (10 of 10 runs on this branch):
 
 ```
-file count: 2
---- SLS_20260805153436816.log ---
-[I] message-2
-[I] message-3
---- SLS_20260805153436505.log.zip ---   <- message-1, archived immediately
+--- SLS_20261021213723109.log ---
+run message 2
+run message 3
+--- SLS_20261021213723102.log.zip ---   <- run message 1, archived by the second write 7 ms later
 ```
 
-Impact: every process run leaves a stray single-entry zip and burns one slot against
-`maximumArchiveFiles`. No data is lost. Entirely independent of the swift-log work — `FileLogger.swift`
-and `sessionLaunchTime` were not touched by this change.
+Impact: only the first session in an empty log directory (a fresh install, or after the logs were deleted) is
+affected. Message 1 sits alone in a one-entry zip instead of the active log, and that archive uses one
+`maximumArchiveFiles` slot until it is purged (oldest first). No data is lost. Later sessions are not affected: their
+first write finds the previous session's file, which initialises the static, so that file is rolled correctly and the
+new one stays whole (checked over three consecutive runs in one directory).
 
-Likely fix (deliberately out of scope): initialise `sessionLaunchTime` eagerly at process start, or
-read it in `shouldRoll` before the `createdAt` guard.
+It is independent of the swift-log work. This PR does not touch `FileLogger.swift` (two commits already on `main`
+made `FileLogger.init` public after `v1.1.0`), and the rolling logic is the same on `v1.1.0`.
+
+The diagnosis was confirmed with a one-line experiment in a scratch clone: `_ = LogSmith.sessionLaunchTime` in
+`SessionRollingFrequency.init()` made 10 of 10 fresh-directory runs keep all three messages in one file, with no
+archive.
+
+Likely fix (deliberately out of scope here, planned for after the merge): fix the session start when the rolling
+strategy is created, as in the experiment, or read it in `shouldRoll` before the `createdAt` guard; add a regression
+test that writes two messages to a fresh manager and expects one log file and no archive.
 
 ---
 
@@ -553,5 +567,6 @@ Recorded in `CLAUDE.md`.
 
 ## Note on this file's location
 
-`.claude/` is **untracked** in git as of this change. The file is not gitignored, so `git add .claude/`
-will commit it — but it will not be picked up by an unqualified `git add -u`.
+This record lived at `.claude/plans/swift-log-backend.md` on the pull request branch while the PR was under review,
+and was removed from the tree before the merge. The link at the end of the PR description points at this, its last
+version.
