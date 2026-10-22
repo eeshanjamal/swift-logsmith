@@ -16,11 +16,11 @@ public import Foundation
 ///
 /// The default formatter produces logs in the following structure:
 /// ```
-/// Date [InternalTags] [LogType.symbolicValue] [ExternalTags] Message {Metadata}
+/// Date [InternalTags] [LogType.symbolicValue] [ExternalTags] Message [Metadata]
 /// ```
-/// An example log output using the default format:
+/// Metadata is written as a dictionary, sorted by key. An example log output using the default format:
 /// ```
-/// 2023-10-27 10:30:00 +0000 [function: login, line: 123] [D] User logged in {"source": "LoginVC"}
+/// 2023-10-27 10:30:00 +0000 [function: login, line: 123] [D] User logged in ["source": "LoginVC"]
 /// ```
 ///
 /// **Customization**
@@ -54,11 +54,11 @@ public final class LogFormatter: NSObject, Sendable {
     ///
     /// Format structure:
     /// ```
-    /// Date [InternalTags] [LogType.symbolicValue] [ExternalTags] Message {Metadata}
+    /// Date [InternalTags] [LogType.symbolicValue] [ExternalTags] Message [Metadata]
     /// ```
     /// Example log output:
     /// ```
-    /// 2023-10-27 10:30:00 +0000 [function: login, line: 123] [D] User logged in {"source": "LoginVC"}
+    /// 2023-10-27 10:30:00 +0000 [function: login, line: 123] [D] User logged in ["source": "LoginVC"]
     /// ```
     public static var `default`: LogFormatter {
             Builder()
@@ -111,11 +111,19 @@ public final class LogFormatter: NSObject, Sendable {
         ///
         /// - Parameters:
         ///   - prefix: Text to be append before the metadata. By default, it will be an empty string.
-        ///   - format: A closure to define specifc format for the metadata dictionary. By default, it will return the input metadata dictionary as string.
+        ///   - format: A closure to define specific format for the metadata dictionary. By default, it will return the input metadata dictionary as string, with its entries sorted by key.
         ///   - suffix: Text to be append after the metadata. By default, it will be an empty string.
         /// - Returns: The `Builder` instance for chaining.
         @discardableResult
-        public func addMetadataPart(prefix: String = "", format: @escaping @Sendable ([String: String]) -> String = { "\($0)" }, suffix: String = "") -> Self {
+        public func addMetadataPart(
+            prefix: String = "",
+            format: @escaping @Sendable ([String: String]) -> String = { metadata in
+                // The same text as printing the dictionary, whose order changes from one run to the next, but sorted by key.
+                let entries = metadata.sorted { $0.key < $1.key }.map { "\(String(reflecting: $0.key)): \(String(reflecting: $0.value))" }
+                return "[\(entries.joined(separator: ", "))]"
+            },
+            suffix: String = ""
+        ) -> Self {
             lock.lock()
             defer { lock.unlock() }
             self.parts.append(MetadataPart(prefix: prefix, format: format, suffix: suffix))
@@ -213,7 +221,7 @@ private final class MessagePart: NSObject, LogPart {
     private let suffix: String
     private let format: @Sendable (String) -> String
     
-    init(prefix: String = "", format: @escaping @Sendable (String) -> String = { $0 }, suffix: String = "") {
+    init(prefix: String, format: @escaping @Sendable (String) -> String, suffix: String) {
         self.prefix = prefix
         self.format = format
         self.suffix = suffix
@@ -234,7 +242,7 @@ private final class MetadataPart: NSObject, LogPart {
     private let suffix: String
     private let format: @Sendable ([String: String]) -> String
     
-    init(prefix: String = "", format: @escaping @Sendable ([String : String]) -> String = { "\($0)" }, suffix: String = "") {
+    init(prefix: String, format: @escaping @Sendable ([String : String]) -> String, suffix: String) {
         self.prefix = prefix
         self.format = format
         self.suffix = suffix
@@ -257,8 +265,8 @@ private final class LogTagPart: NSObject, LogPart {
     private let format: @Sendable (Tag) -> String
     private let separator: String
 
-    init(prefix: String = "", format: @escaping @Sendable (Tag) -> String = { $0.value }, separator: String = " ",
-         suffix: String = "", filter: @escaping @Sendable (Tag) -> Bool = { _ in true }) {
+    init(prefix: String, format: @escaping @Sendable (Tag) -> String, separator: String,
+         suffix: String, filter: @escaping @Sendable (Tag) -> Bool) {
         self.prefix = prefix
         self.format = format
         self.suffix = suffix

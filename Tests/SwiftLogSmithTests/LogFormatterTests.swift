@@ -153,6 +153,46 @@ final class LogFormatterTests: XCTestCase {
         }
     }
     
+    /// Renders `metadata` the way `addMetadataPart()` does when it is given no format of its own.
+    private func renderedByDefault(_ metadata: [String: String]) -> String {
+        let formatter = LogFormatter.Builder().addMetadataPart().build()
+        return formatter.format(message: LogMessage(message: "", logType: .none, tags: [], metadata: metadata))
+    }
+    
+    func testDefaultMetadataFormat_WithSeveralEntries_ShouldSortByKey() {
+        XCTAssertEqual(renderedByDefault(["zebra": "1", "apple": "2", "mango": "3"]), #"["apple": "2", "mango": "3", "zebra": "1"]"#)
+        XCTAssertEqual(renderedByDefault(["only": "one"]), #"["only": "one"]"#)
+    }
+    
+    func testDefaultMetadataFormat_WithNoEntries_ShouldProduceNothing() {
+        XCTAssertEqual(renderedByDefault([:]), "")
+    }
+    
+    func testDefaultMetadataFormat_WithOneEntry_ShouldMatchHowSwiftPrintsTheDictionary() {
+        // A single entry has no order to disagree about, so the text must be exactly what printing the dictionary gives,
+        // escaping included.
+        let values = ["plain", #"say "hi""#, #"C:\temp"#, "two\nlines", "tab\there", "emoji 😀", "", #"[nested=[x=1]]"#]
+        
+        for value in values {
+            let metadata = ["key": value]
+            XCTAssertEqual(renderedByDefault(metadata), "\(metadata)", "value: \(value)")
+        }
+    }
+    
+    func testDefaultMetadataFormat_WithEntriesInsertedInDifferentOrders_ShouldRenderTheSame() {
+        // Arrange — the same entries added in opposite orders, which a plain dictionary may iterate differently.
+        let keys = (0..<30).map { "key\($0)" }
+        var forward: [String: String] = [:]
+        var backward: [String: String] = [:]
+        keys.forEach { forward[$0] = $0.uppercased() }
+        keys.reversed().forEach { backward[$0] = $0.uppercased() }
+        let expected = "[" + keys.sorted().map { #""\#($0)": "\#($0.uppercased())""# }.joined(separator: ", ") + "]"
+        
+        // Act & Assert
+        XCTAssertEqual(renderedByDefault(forward), expected)
+        XCTAssertEqual(renderedByDefault(backward), expected)
+    }
+    
     func testSingleTagPartFormat() throws {
         let logger = mockLogger!
         // 1. Use the nested builder to create a custom format.

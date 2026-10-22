@@ -90,10 +90,10 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// - Parameters:
     ///   - newLogger: The logger instance to add (e.g., `FileLogger`, `OSLogger`, or a custom implementation).
-    ///   - minLogLevel: The minimum severity level this specific logger should handle. Defaults to `.default`.
+    ///   - minLogLevel: The minimum severity level this specific logger should handle. Defaults to `.all`.
     ///   - minLogType: The minimum specific log type this logger should handle. Defaults to `.none`.
     ///   - completion: An optional closure executed when the operation completes. Returns `true` if added successfully, `false` if it was already present.
-    public static func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none,_ completion: (@Sendable(Bool) -> Void)? = nil) {
+    public static func addLogger(newLogger: any ILogger, minLogLevel: LogLevel = .all, minLogType: LogType = .none,_ completion: (@Sendable(Bool) -> Void)? = nil) {
         shared.addLogger(newLogger: newLogger, minLogLevel: minLogLevel, minLogType: minLogType, completion: completion)
     }
     
@@ -113,10 +113,10 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// - Parameters:
     ///   - newLogger: The new logger instance to set as default.
-    ///   - minLogLevel: The minimum severity level this specific logger should handle. Defaults to `.default`.
+    ///   - minLogLevel: The minimum severity level this specific logger should handle. Defaults to `.all`.
     ///   - minLogType: The minimum specific log type this logger should handle. Defaults to `.none`.
     ///   - completion: An optional closure executed when the operation completes.
-    public static func replaceDefaultLogger(with newLogger: any ILogger, minLogLevel: LogLevel = .default, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
+    public static func replaceDefaultLogger(with newLogger: any ILogger, minLogLevel: LogLevel = .all, minLogType: LogType = .none, completion: (@Sendable(Bool) -> Void)? = nil) {
         shared.replaceDefaultLogger(with: newLogger, minLogLevel: minLogLevel, minLogType: minLogType, completion: completion)
     }
     
@@ -197,12 +197,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func log(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .none, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func log(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .none, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a trace message to all active loggers with `LogType.trace`.
@@ -214,12 +215,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logT(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .trace, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logT(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .trace, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a debug message to all active loggers with `LogType.debug`.
@@ -231,12 +233,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logD(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .debug, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logD(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .debug, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a notice message to all active loggers with `LogType.notice`.
@@ -248,12 +251,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logN(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .notice, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logN(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .notice, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs an informative message to all active loggers with `LogType.info`.
@@ -265,12 +269,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logI(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .info, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logI(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .info, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a warning message to all active loggers with `LogType.warning`.
@@ -282,12 +287,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logW(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .warning, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logW(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .warning, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs an error message to all active loggers with `LogType.error`.
@@ -299,12 +305,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logE(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .error, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logE(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .error, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a critical message to all active loggers with `LogType.critical`.
@@ -316,12 +323,13 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logC(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .critical, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logC(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .critical, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
     
     /// Logs a fault message to all active loggers with `LogType.fault`.
@@ -333,19 +341,50 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// - Parameters:
     ///   - message: The message string to log.
     ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
     ///   - fileId: The source file identifier where the log was called.
     ///   - function: The source function name where the log was called.
     ///   - line: The source line number where the log was called.
     ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
-    public static func logF(_ message: String, metadata: [String: String] = Dictionary(), fileId: StaticString = #fileID, function: StaticString = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
-        shared.queue.async { shared.defaultManager.log(message: message, logType: .fault, metadata: metadata, fileId: fileId, function: function, line: line, completion: completion) }
+    public static func logF(_ message: String, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        logInternal(message, logType: .fault, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion)
     }
-    
+
+    /// Queues a message for the default manager with an explicit ``LogType``, optional structured payload and source information.
+    ///
+    /// The single place every logging function funnels through: the `log`, `logT` … `logF` facades pass their own severity and
+    /// their caller's source location, and the `SwiftLogSmithBackend` module passes the severity, payload and call site of the
+    /// `swift-log` message it received. It is `package`-scoped, so the package's own targets can call it and consumers of the
+    /// library cannot. `fileId` and `function` are `String` values so that a call site received at runtime can be forwarded.
+    ///
+    /// Messages logged here go through the same serial queue as every other `LogSmith` operation, so their ordering
+    /// relative to calls like ``addLogger(newLogger:minLogLevel:minLogType:_:)`` or ``setMinimumLogLevel(_:)`` is preserved.
+    ///
+    /// The source location parameters have no defaults on purpose: a caller has to forward its own caller's location
+    /// explicitly, so it cannot end up logging its own file and function by accident.
+    ///
+    /// - Parameters:
+    ///   - message: The message string to log.
+    ///   - logType: The severity type of the log.
+    ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
+    ///   - fileId: The source file identifier where the log originated.
+    ///   - function: The source function name where the log originated.
+    ///   - line: The source line number where the log originated.
+    ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
+    package static func logInternal(_ message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String, function: String, line: UInt, completion: (@Sendable (Bool) -> Void)? = nil) {
+        shared.queue.async { shared.defaultManager.log(message: message, logType: logType, metadata: metadata, payload: payload, fileId: fileId, function: function, line: line, completion: completion) }
+    }
+
 }
 
 /// Represents different type (or severity) for logging.
 ///
 /// Provides a granular way to categorize logs, which can be used for low-level filtering. It also provide visual identification (via string or symbolic value).
+///
+/// Types are ordered by severity, lowest first: `trace`, `debug`, `info`, `notice`, `warning`, `error`, `fault`, `critical`, and the raw values follow that
+/// order. A minimum log type admits that type and everything more severe. `none` and `undefined` carry no severity and sort below every other type
+/// (`undefined` lowest), so a minimum above them drops them.
 @objc public enum LogType: Int, CaseIterable, Sendable {
     
     /// This log type can be used for logs with no specified severity. It's useful for maintaining compatibility with systems where severity isn't provided.
@@ -354,17 +393,17 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// This log type can be used for general-purpose logging. It's useful for messages that do not require a specific severity level.
     case none       = 0
     
-    /// This log type can be used for important application milestones. It's useful for events that should be noted during the application's lifecycle.
-    case notice     = 1
-    
-    /// This log type can be used for standard application progress. It's useful for general information about the application's state.
-    case info       = 2
+    /// This log type can be used for tracing program execution. It's useful for very fine-grained informational events and debugging.
+    case trace      = 1
     
     /// This log type can be used for diagnostic purposes. It's useful for capturing detailed information during development and debugging sessions.
-    case debug      = 3
+    case debug      = 2
     
-    /// This log type can be used for tracing program execution. It's useful for very fine-grained informational events and deep debugging.
-    case trace      = 4
+    /// This log type can be used for standard application progress. It's useful for general information about the application's state.
+    case info       = 3
+    
+    /// This log type can be used for important application milestones. It's useful for events that should be noted during the application's lifecycle.
+    case notice     = 4
     
     /// This log type can be used for non-critical issues. It's useful for flagging potentially harmful situations that don't prevent the app from continuing.
     case warning    = 5
@@ -422,14 +461,12 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// For example, both `LogType.warning` and `LogType.error` map to `LogLevel.error`.
     public var logLevel: LogLevel {
         switch self {
-            case .undefined:
-                return .undefined
-            case .none, .notice:
-                return .default
-            case .info:
-                return .info
-            case .debug, .trace:
+            case .none, .undefined:
+                return .all
+            case .trace, .debug:
                 return .debug
+            case .info, .notice:
+                return .info
             case .warning, .error:
                 return .error
             case .fault, .critical:
@@ -467,19 +504,19 @@ public final class LogTypeUtils: NSObject, Sendable  {
 /// Represents different level (or severity) for logging.
 ///
 /// Provides a broader way to categorize logs, which can be used for high-level filtering.
+///
+/// Levels are ordered by severity, lowest first: `debug`, `info`, `error`, `fault`, and the raw values follow that order. A minimum log level admits that level and
+/// everything more severe. `all` sits below them as a minimum and applies no filtering, so logs with any log level will be included with it.
 @objc public enum LogLevel: Int, CaseIterable, Sendable {
     
-    /// This log level can be used for filtering logs with no severity. It's useful when no specific filtering threshold is desired.
-    case undefined  = -1
+    /// This log level can be used for filtering with no severity. It's useful when no specific filtering threshold is desired. It's represented as a high-level filter for `LogType.none` & `LogType.undefined`.
+    case all        = 0
     
-    /// This log level can be used for filtering general-purpose logs. It's represented as a high-level filter for `LogType.none` & `LogType.notice`.
-    case `default`  = 0
+    /// This log level can be used for filtering debugging messages. It's represented as a high-level filter for `LogType.debug` & `LogType.trace`.
+    case debug      = 1
     
-    /// This log level can be used for filtering informational messages. It's represented as a high-level filter for `LogType.info`.
-    case info       = 1
-    
-    /// This log level can be used for filtering detailed messages. It's represented as a high-level filter for `LogType.debug` & `LogType.trace`.
-    case debug      = 2
+    /// This log level can be used for filtering informational messages. It's represented as a high-level filter for `LogType.info` & `LogType.notice`.
+    case info       = 2
     
     /// This log level can be used for filtering non-fatal failures. It's represented as a high-level filter for `LogType.warning` & `LogType.error`.
     case error      = 3
