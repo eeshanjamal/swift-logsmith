@@ -42,8 +42,7 @@ public final class Tag: NSObject, Sendable {
 ///
 /// ``LogMessage/metadata`` is a flat `[String: String]` dictionary, which is enough for most logs but
 /// cannot represent richer, nested or strongly-typed context. `LogPayload` provides an escape hatch:
-/// an integration can define its own payload type, hand it to ``LogManager/log(message:logType:metadata:payload:fileId:function:line:completion:)``
-/// or to any of ``LogSmith``'s logging functions (`log`, `logT` … `logF`, through their `payload` parameter),
+/// an integration can define its own payload type, hand it to the logging functions of ``LogManager`` or ``LogSmith``,
 /// and any ``ILogger`` can recover it with a conditional cast.
 ///
 /// The protocol itself has no requirements — it exists purely so the payload can travel through the

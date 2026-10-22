@@ -122,7 +122,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     
     /// Sets the global minimum log level required for any message to be processed.
     ///
-    /// Logs with a level lower than this will be ignored by *all* loggers managed by `LogSmith`. `.all`, the default, applies no minimum.
+    /// Logs with a level lower than this will be ignored by *all* loggers managed by `LogSmith`.
     ///
     /// - Parameter logLevel: The minimum `LogLevel` (e.g., `.info`, `.error`).
     public static func setMinimumLogLevel(_ logLevel: LogLevel) {
@@ -131,8 +131,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     
     /// Sets the global minimum log type required for any message to be processed.
     ///
-    /// Logs with a type lower than this will be ignored by *all* loggers managed by `LogSmith`, where types are ordered by severity (see ``LogType``).
-    /// `.none`, the default, applies no minimum.
+    /// Logs with a type lower than this will be ignored by *all* loggers managed by `LogSmith`.
     ///
     /// - Parameter logType: The minimum `LogType` (e.g., `.info`, `.critical`).
     public static func setMinimumLogType(_ logType: LogType) {
@@ -385,7 +384,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
 ///
 /// Types are ordered by severity, lowest first: `trace`, `debug`, `info`, `notice`, `warning`, `error`, `fault`, `critical`, and the raw values follow that
 /// order. A minimum log type admits that type and everything more severe. `none` and `undefined` carry no severity and sort below every other type
-/// (`undefined` lowest), so a minimum above them drops them; used as a minimum, they apply no filtering.
+/// (`undefined` lowest), so a minimum above them drops them.
 @objc public enum LogType: Int, CaseIterable, Sendable {
     
     /// This log type can be used for logs with no specified severity. It's useful for maintaining compatibility with systems where severity isn't provided.
@@ -394,7 +393,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     /// This log type can be used for general-purpose logging. It's useful for messages that do not require a specific severity level.
     case none       = 0
     
-    /// This log type can be used for tracing program execution. It's useful for very fine-grained informational events and deep debugging.
+    /// This log type can be used for tracing program execution. It's useful for very fine-grained informational events and debugging.
     case trace      = 1
     
     /// This log type can be used for diagnostic purposes. It's useful for capturing detailed information during development and debugging sessions.
@@ -459,8 +458,7 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     ///
     /// This mapping is used for identifying the `LogLevel` where Multiple `LogType` might fall under a single `LogLevel`.
     ///
-    /// For example, both `LogType.warning` and `LogType.error` map to `LogLevel.error`. The mapping never goes down as severity goes up, so a `LogLevel`
-    /// minimum cuts the types at one of the same points as a `LogType` minimum would, only more coarsely.
+    /// For example, both `LogType.warning` and `LogType.error` map to `LogLevel.error`.
     public var logLevel: LogLevel {
         switch self {
             case .none, .undefined:
@@ -507,15 +505,14 @@ public final class LogTypeUtils: NSObject, Sendable  {
 ///
 /// Provides a broader way to categorize logs, which can be used for high-level filtering.
 ///
-/// Levels are ordered by severity, lowest first: `debug`, `info`, `error`, `fault`, and the raw values follow that order. A minimum log level admits logs
-/// whose ``LogType/logLevel`` is at least that level. `all` sits below them: as a minimum it applies no filtering, so every log passes, and it is the level
-/// of logs that carry no severity.
+/// Levels are ordered by severity, lowest first: `debug`, `info`, `error`, `fault`, and the raw values follow that order. A minimum log level admits that level and
+/// everything more severe. `all` sits below them as a minimum and applies no filtering, so logs with any log level will be included with it.
 @objc public enum LogLevel: Int, CaseIterable, Sendable {
     
-    /// This log level can be used for filtering with no minimum: every log passes, including those with no severity. It's also the level of those logs, `LogType.none` & `LogType.undefined`.
+    /// This log level can be used for filtering with no severity. It's useful when no specific filtering threshold is desired. It's represented as a high-level filter for `LogType.none` & `LogType.undefined`.
     case all        = 0
     
-    /// This log level can be used for filtering detailed messages. It's represented as a high-level filter for `LogType.debug` & `LogType.trace`.
+    /// This log level can be used for filtering debugging messages. It's represented as a high-level filter for `LogType.debug` & `LogType.trace`.
     case debug      = 1
     
     /// This log level can be used for filtering informational messages. It's represented as a high-level filter for `LogType.info` & `LogType.notice`.
