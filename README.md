@@ -232,7 +232,7 @@ graph TD
 ## Documentation
 
 Full API documentation is available here:  
-[**Read the Documentation**](https://eeshanjamal.github.io/swift-logsmith/documentation/swiftlogsmith/)
+[**Read the Documentation**](https://eeshanjamal.github.io/swift-logsmith/documentation/)
 
 ## License
 
