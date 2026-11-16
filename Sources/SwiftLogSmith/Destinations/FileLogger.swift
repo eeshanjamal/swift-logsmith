@@ -12,6 +12,9 @@ import ZIPFoundation
 /// An enum to sort the list of log files.
 ///
 /// It provides various sort keys based on ``LogFile`` properties to sort the list of files.
+#if hasAttribute(nonexhaustive)
+@nonexhaustive(warn)
+#endif
 @objc public enum LogFileSortKey: Int, Sendable {
     /// Sort property is not specified.
     case undefined
@@ -26,6 +29,9 @@ import ZIPFoundation
 }
 
 /// An enum to specify the direction of sort for the list of log files.
+#if hasAttribute(nonexhaustive)
+@nonexhaustive(warn)
+#endif
 @objc public enum SortOrder: Int, Sendable {
     /// Sort in ascending order (e.g., A-Z, 0-9, oldest to newest).
     case ascending
@@ -113,6 +119,9 @@ public final class FileLoggerManager: NSObject, @unchecked Sendable {
     public static let FailedDeletionsKey = "FileLoggerManagerFailedDeletionsKey"
     
     /// An enum with different error codes for `FileLoggerManager` operations failure.
+    #if hasAttribute(nonexhaustive)
+    @nonexhaustive(warn)
+    #endif
     @objc public enum ErrorCode: Int, Sendable {
         /// An error occurred during the purging of old log archives. Check the `FailedDeletionsKey` in `userInfo` for details.
         case purgeFailed

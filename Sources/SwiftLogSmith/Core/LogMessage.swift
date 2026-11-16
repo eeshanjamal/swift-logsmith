@@ -9,6 +9,9 @@
 public import Foundation
 
 /// An enum that distinguishes between different implementations of ``LogTag`` by associating a type to each one.
+#if hasAttribute(nonexhaustive)
+@nonexhaustive(warn)
+#endif
 @objc public enum TagType: Int, Sendable {
     
     /// This type represent ``InternalTag`` implementation.

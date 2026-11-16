@@ -46,6 +46,9 @@ public final class LogTagIdentifiers: NSObject, Sendable {
 }
 
 /// This enum represents the different types of implicit tags an ``InternalTag`` instance can generate.
+#if hasAttribute(nonexhaustive)
+@nonexhaustive(warn)
+#endif
 @objc public enum InternalTagType: Int, Sendable {
     
     /// An internal tag type to represent the relative file source path.
