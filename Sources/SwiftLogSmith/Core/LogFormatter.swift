@@ -33,7 +33,7 @@ public import Foundation
 /// ```swift
 /// let myFormatter = LogFormatter.Builder()
 ///     .addTagsPart(prefix: "[", suffix: "] ", filter: { $0.identifier.uppercased() == "DEBUG" }) // Matches the symbolic tag
-///     .addTagsPart(prefix: "[", format: { "\($0.identifier): \($0.value)" }, suffix: "] ", filter: { $0.tagType == .internal })
+///     .addTagsPart(prefix: "[", format: { tag, _ in "\(tag.identifier): \(tag.value)" }, suffix: "] ", filter: { $0.tagType == .internal })
 ///     .addTagsPart(prefix: "[", separator: ", ", suffix: "] ")
 ///     .addMessagePart(prefix: "The ", suffix: ".")
 ///     .build()
@@ -63,7 +63,7 @@ public final class LogFormatter: NSObject, Sendable {
     public static var `default`: LogFormatter {
             Builder()
             .addTagsPart(suffix: " ", filter: { $0.identifier == LogTagIdentifiers.date })
-            .addTagsPart(prefix: "[", format: {"\($0.identifier): \($0.value)"}, separator: ", ", suffix: "] ", filter: { $0.tagType == .internal })
+            .addTagsPart(prefix: "[", format: { tag, _ in "\(tag.identifier): \(tag.value)" }, separator: ", ", suffix: "] ", filter: { $0.tagType == .internal })
             .addTagsPart(prefix: "[", suffix: "] ", filter: { logTypeValues.contains($0.identifier) })
             .addTagsPart(prefix: "[", separator: ", ", suffix: "] ")
             .addMessagePart()
@@ -139,13 +139,14 @@ public final class LogFormatter: NSObject, Sendable {
         ///
         /// - Parameters:
         ///   - prefix: Text to be append before *this subset* of tags. By default, it will be an empty string.
-        ///   - format: A closure to define specific format for *each individual tag*. By default, it will return the tag's value.
+        ///   - format: A closure to define specific format for *each individual tag*. It receives the tag and the ``LogMessage`` being formatted,
+        ///     so a tag's text can draw on the rest of the message (e.g., its ``LogMessage/logType``). By default, it will return the tag's value.
         ///   - separator: Text to insert between tags (if multiple tags are captured by the filter).
         ///   - suffix: Text to be append after *this subset* of tags. By default, it will be an empty string.
         ///   - filter: A closure to select which tags should be included in this part.
         /// - Returns: The `Builder` instance for chaining.
         @discardableResult
-        public func addTagsPart(prefix: String = "", format: @escaping @Sendable (Tag) -> String = { $0.value }, separator: String = " ",
+        public func addTagsPart(prefix: String = "", format: @escaping @Sendable (Tag, LogMessage) -> String = { tag, _ in tag.value }, separator: String = " ",
                                 suffix: String = "", filter: @escaping @Sendable (Tag) -> Bool = { _ in true }) -> Self {
             lock.lock()
             defer { lock.unlock() }
@@ -262,10 +263,10 @@ private final class LogTagPart: NSObject, LogPart {
     private let prefix: String
     private let suffix: String
     private let filter: @Sendable (Tag) -> Bool
-    private let format: @Sendable (Tag) -> String
+    private let format: @Sendable (Tag, LogMessage) -> String
     private let separator: String
 
-    init(prefix: String, format: @escaping @Sendable (Tag) -> String, separator: String,
+    init(prefix: String, format: @escaping @Sendable (Tag, LogMessage) -> String, separator: String,
          suffix: String, filter: @escaping @Sendable (Tag) -> Bool) {
         self.prefix = prefix
         self.format = format
@@ -278,7 +279,7 @@ private final class LogTagPart: NSObject, LogPart {
         let tagsToConsume = formattingState.consumeTags(where: filter)
         guard !tagsToConsume.isEmpty else { return "" }
 
-        let content = tagsToConsume.map(format).joined(separator: separator)
+        let content = tagsToConsume.map { format($0, logMessage) }.joined(separator: separator)
         return "\(prefix)\(content)\(suffix)"
     }
 }

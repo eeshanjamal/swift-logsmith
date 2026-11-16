@@ -201,7 +201,7 @@ final class LogFormatterTests: XCTestCase {
             .addMessagePart()
             .addTagsPart(
                 prefix: " - <",
-                format: { "\($0.identifier):\($0.value)" },
+                format: { tag, _ in "\(tag.identifier):\(tag.value)" },
                 suffix: ">",
                 filter: { $0.identifier == "TestTag" }
             )
@@ -237,13 +237,13 @@ final class LogFormatterTests: XCTestCase {
         let consumingFormatter = LogFormatter.Builder()
             .addTagsPart(
                 prefix: "[",
-                format: { "\($0.identifier.prefix(1)):\($0.value)" }, // e.g., I:Value1
+                format: { tag, _ in "\(tag.identifier.prefix(1)):\(tag.value)" }, // e.g., I:Value1
                 suffix: "]",
                 filter: { $0.identifier == "InternalTag" }
             )
             .addTagsPart(
                 prefix: " ", // Space prefix to separate from first tag part
-                format: { "\($0.identifier):\($0.value)" },
+                format: { tag, _ in "\(tag.identifier):\(tag.value)" },
                 separator: ", ",
                 filter: { $0.identifier == "OtherTag" } // Make filter specific
             )
@@ -270,5 +270,23 @@ final class LogFormatterTests: XCTestCase {
         LogSmith.removeTag(identifier: "InternalTag")
         LogSmith.removeTag(identifier: "OtherTag")
     }
-    
+
+    func testTagsPartFormat_WithMessageArgument_ShouldReceiveTheMessageBeingFormatted() throws {
+        let logger = mockLogger!
+        logger.formatter = LogFormatter.Builder()
+            .addTagsPart(format: { tag, message in "\(tag.value)@\(message.logType.stringValue):\(message.message)" },
+                         filter: { $0.identifier == "MessageAwareTag" })
+            .build()
+        LogSmith.addTag(ExternalTag(identifier: "MessageAwareTag", value: "tag"))
+
+        expectCompletion(description: "The format closure should see the message it formats") { fulfill in
+            LogSmith.logW("hello") { _ in
+                XCTAssertEqual(logger.lastLoggedMessage, "tag@warning:hello")
+                fulfill()
+            }
+        }
+
+        LogSmith.removeTag(identifier: "MessageAwareTag")
+    }
+
 }
