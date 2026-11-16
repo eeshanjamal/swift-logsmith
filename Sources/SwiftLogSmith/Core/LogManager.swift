@@ -249,8 +249,9 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
 
     private func extractTags(logTagger: LogTagger?, logType: LogType, callSite: LogCallSite, completion: @escaping (@Sendable([Tag]) -> Void)) {
         if let logTagger = logTagger {
+            let managerQueueLabel = queue.label
             logTagger.logTags(logType: logType) { logTags in
-                completion(LogTagsExtractor().extract(logTags: logTags, callSite: callSite))
+                completion(LogTagsExtractor(callSite: callSite, managerQueueLabel: managerQueueLabel).extract(logTags: logTags))
             }
         }
         else {
@@ -327,34 +328,70 @@ package struct LogCallSite: Sendable {
     package let line: UInt
     /// The moment the log was called.
     package let timestamp: Date
+    /// The value of a ``InternalTagType/callerThreadName`` tag: the calling thread's name, `main`, or its thread ID in hex.
+    package let threadName: String
+    /// The value of a ``InternalTagType/callerQueueLabel`` tag: the label of the dispatch queue the caller is running.
+    package let queueLabel: String
+    /// The value of a ``InternalTagType/callerName`` tag: the calling thread's name if it has one, otherwise ``queueLabel``.
+    package let callerName: String
 
+    /// Captures the context of a log call. Call it on the caller's thread, since it also reads the current thread and queue.
+    /// - Parameters:
+    ///   - fileId: The source file where the log was called.
+    ///   - function: The source function where the log was called.
+    ///   - line: The source line number where the log was called.
+    ///   - timestamp: The moment the log was called.
     package init(fileId: String, function: String, line: UInt, timestamp: Date) {
         self.fileId = fileId
         self.function = function
         self.line = line
         self.timestamp = timestamp
+
+        let ownName = Thread.current.name.flatMap { $0.isEmpty ? nil : $0 }
+        let queueLabel = DispatchQueue.currentLabel ?? ""
+        self.queueLabel = queueLabel
+        self.threadName = ownName ?? (Thread.isMainThread ? "main" : LogCallSite.currentThreadID())
+        self.callerName = ownName ?? queueLabel
+    }
+
+    /// The system-wide ID of the current thread in hex, as Console and Instruments show it (e.g., `0x1102e33`).
+    private static func currentThreadID() -> String {
+        var threadID: UInt64 = 0
+        #if swift(>=6.2)
+            _ = unsafe pthread_threadid_np(nil, &threadID)
+        #else
+            _ = pthread_threadid_np(nil, &threadID)
+        #endif
+        return "0x" + String(threadID, radix: 16)
     }
 }
 
 /// A helper class that uses the visitor pattern to convert ``LogTag`` protocol instances into concrete ``Tag`` data instances.
 ///
-/// > Note: This class is not internally thread-safe and is marked as `@unchecked Sendable` because it is intended for use exclusively within
-/// the single-threaded context of the `LogManager`'s serial dispatch queue. It shouldn't be shared across concurrent domains before actually making it thread-safe.
+/// > Note: This class is not internally thread-safe and is marked as `@unchecked Sendable` because each instance handles a single extraction,
+/// on the serial queue of the ``LogTagger`` being read. It shouldn't be shared across concurrent domains before actually making it thread-safe.
 private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
     
     /// Writes ``InternalTagType/timestamp`` tag values: ISO 8601 in UTC, as ``InternalTagType/valueFormat`` documents.
     private static let timestampValueFormatter = LockedDateFormatter(format: InternalTagType.timestampValueFormat, timeZone: TimeZone(identifier: "UTC")!)
 
     private var tags = [Tag]()
-    private var callSite = LogCallSite(fileId: "", function: "", line: 0, timestamp: Date(timeIntervalSince1970: 0))
+    private let callSite: LogCallSite
+    private let managerQueueLabel: String
+
+    /// Creates an extractor for one log call.
+    /// - Parameters:
+    ///   - callSite: The context of the log call, used for the values of ``InternalTag`` instances.
+    ///   - managerQueueLabel: The label of the ``LogManager`` queue processing the log, used for any ``InternalTag`` of type `.managerQueueLabel`.
+    init(callSite: LogCallSite, managerQueueLabel: String) {
+        self.callSite = callSite
+        self.managerQueueLabel = managerQueueLabel
+    }
     
     /// Extracts and transforms a collection of ``LogTag`` into an array of ``Tag``.
-    /// - Parameters:
-    ///   - logTags: The array of ``LogTag`` to process.
-    ///   - callSite: The context of the log call, used for the values of ``InternalTag`` instances.
+    /// - Parameter logTags: The array of ``LogTag`` to process.
     /// - Returns: An array of concrete ``Tag`` objects.
-    func extract(logTags: [any LogTag], callSite: LogCallSite) -> [Tag] {
-        self.callSite = callSite
+    func extract(logTags: [any LogTag]) -> [Tag] {
         tags.removeAll()
         logTags.forEach { logTag in
             logTag.visit(logTagVisitor: self)
@@ -375,29 +412,21 @@ private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
             value = callSite.function
         case .line:
             value = "\(callSite.line)"
-        case .threadName:
-            value = Utils.threadName()
+        case .threadName, .callerName:
+            value = callSite.callerName
         case .timestamp:
             value = LogTagsExtractor.timestampValueFormatter.string(from: callSite.timestamp)
+        case .callerThreadName:
+            value = callSite.threadName
+        case .callerQueueLabel:
+            value = callSite.queueLabel
+        case .managerQueueLabel:
+            value = managerQueueLabel
         }
         tags.append(Tag(identifier: internalTag.identifier, value: value, tagType: .internal))
     }
 }
 
-/// A private utility class for helper functions.
-private final class Utils: Sendable {
-    
-    /// Returns the name of the current thread or dispatch queue.
-    static func threadName() -> String {
-        if Thread.isMainThread {
-            return "main"
-        }
-        else {
-            return DispatchQueue.currentLabel ?? Thread.current.name ?? "unknown"
-        }
-    }
-    
-}
 
 /// A private wrapper that holds an ``ILogger`` instance along with its specific configuration.
 @objcMembers

@@ -158,11 +158,6 @@ final class LogTaggerTests: XCTestCase {
         XCTAssertEqual(lineTag.identifier, "line")
         XCTAssertEqual(lineTag.logType, .info)
         XCTAssertEqual(lineTag.internalTagType, .line)
-        
-        let threadTag = InternalTag(internalTagType: .threadName, logType: .notice)
-        XCTAssertEqual(threadTag.identifier, "threadName")
-        XCTAssertEqual(threadTag.logType, .notice)
-        XCTAssertEqual(threadTag.internalTagType, .threadName)
 
         let timestampTag = InternalTag(internalTagType: .timestamp, logType: .error)
         XCTAssertEqual(timestampTag.identifier, "timestamp")
@@ -171,7 +166,8 @@ final class LogTaggerTests: XCTestCase {
     }
 
     func testInternalTagType_InitWithIdentifier_ShouldRoundTripEveryStringValue() {
-        let allTypes: [InternalTagType] = [.file, .function, .line, .threadName, .timestamp]
+        let allTypes: [InternalTagType] = [.file, .function, .line, .timestamp,
+                                           .callerThreadName, .callerQueueLabel, .callerName, .managerQueueLabel]
         for type in allTypes {
             XCTAssertEqual(InternalTagType(identifier: type.stringValue), type)
         }
@@ -182,7 +178,7 @@ final class LogTaggerTests: XCTestCase {
     func testValueFormat_ShouldOnlyExistForTimestamp() {
         XCTAssertEqual(InternalTagType.timestamp.valueFormat, "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX")
         XCTAssertEqual(InternalTagTypeUtils.valueFormat(for: .timestamp), InternalTagType.timestamp.valueFormat)
-        for type: InternalTagType in [.file, .function, .line, .threadName] {
+        for type: InternalTagType in [.file, .function, .line, .callerThreadName, .callerQueueLabel, .callerName, .managerQueueLabel] {
             XCTAssertNil(type.valueFormat)
             XCTAssertNil(InternalTagTypeUtils.valueFormat(for: type))
         }
@@ -195,5 +191,25 @@ final class LogTaggerTests: XCTestCase {
         formatter.dateFormat = InternalTagType.timestamp.valueFormat
         let parsed = formatter.date(from: "2025-11-15T10:30:00.123Z")
         XCTAssertEqual(parsed?.timeIntervalSince1970 ?? 0, 1_763_202_600.123, accuracy: 0.0005)
+    }
+
+    func testCallerAndManagerTagTypes_ShouldUseTheirIdentifiers() {
+        XCTAssertEqual(InternalTagType.callerThreadName.stringValue, LogTagIdentifiers.callerThreadName)
+        XCTAssertEqual(InternalTagType.callerQueueLabel.stringValue, LogTagIdentifiers.callerQueueLabel)
+        XCTAssertEqual(InternalTagType.callerName.stringValue, LogTagIdentifiers.callerName)
+        XCTAssertEqual(InternalTagType.managerQueueLabel.stringValue, LogTagIdentifiers.managerQueueLabel)
+        XCTAssertEqual(InternalTag(internalTagType: .callerName).identifier, "callerName")
+    }
+
+    /// Marked deprecated so that it can exercise the deprecated `threadName` without warnings.
+    @available(*, deprecated)
+    func testDeprecatedThreadName_ShouldKeepItsIdentifier() {
+        let threadTag = InternalTag(internalTagType: .threadName, logType: .notice)
+        XCTAssertEqual(threadTag.identifier, "threadName")
+        XCTAssertEqual(threadTag.identifier, LogTagIdentifiers.threadName)
+        XCTAssertEqual(threadTag.logType, .notice)
+        XCTAssertEqual(threadTag.internalTagType, .threadName)
+        XCTAssertEqual(InternalTagType(identifier: "threadName"), .threadName)
+        XCTAssertNil(InternalTagType.threadName.valueFormat)
     }
 }
