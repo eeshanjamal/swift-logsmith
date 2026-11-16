@@ -60,7 +60,7 @@ final class LogSmithTests: XCTestCase {
         LogSmith.setMinimumLogLevel(.all)
         LogSmith.setMinimumLogType(.none)
         // Cleanup tags that might have been added
-        LogSmith.removeTag(identifier: LogTagIdentifiers.date)
+        LogSmith.removeTag(identifier: LogTagIdentifiers.timestamp)
         LogSmith.removeTag(identifier: LogTagIdentifiers.file)
         LogSmith.removeTag(identifier: LogTagIdentifiers.function)
         LogSmith.removeTag(identifier: LogTagIdentifiers.line)
@@ -72,10 +72,8 @@ final class LogSmithTests: XCTestCase {
         // Arrange
         let logger = mockLogger!
         
-        // Date tag
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-mm-dd HH:mm:ss.SSS"
-        LogSmith.addTag(ExternalTag(identifier: LogTagIdentifiers.date, valueProvider: { dateFormatter.string(from: Date()) }))
+        // Timestamp tag
+        LogSmith.addTag(InternalTag(internalTagType: .timestamp))
         
         // System tags
         LogSmith.addTag(InternalTag(internalTagType: .file))
@@ -177,22 +175,27 @@ final class LogSmithTests: XCTestCase {
         // Arrange
         let logger = mockLogger!
         let payload = TestLogPayload(id: 11)
+        // 2025-11-15 10:30:00.123 UTC, a value whose milliseconds a truncating formatter would print as .122.
+        let timestamp = Date(timeIntervalSince1970: 1_763_202_600.123)
         LogSmith.addTag(InternalTag(internalTagType: .file))
         LogSmith.addTag(InternalTag(internalTagType: .function))
         LogSmith.addTag(InternalTag(internalTagType: .line))
+        LogSmith.addTag(InternalTag(internalTagType: .timestamp))
 
         // Act & Assert
         expectCompletion(description: "Log with payload should be delivered") { fulfill in
             LogSmith.logInternal("bridged", logType: .warning, metadata: ["k": "v"], payload: payload,
-                                 fileId: "Module/File.swift", function: "doWork()", line: 42) { _ in
+                                 fileId: "Module/File.swift", function: "doWork()", line: 42, timestamp: timestamp) { _ in
                 let message = logger.lastLogMessage(for: .warning)
                 XCTAssertTrue(message?.payload === payload, "The payload should arrive as the same instance")
                 XCTAssertEqual(message?.metadata, ["k": "v"])
+                XCTAssertEqual(message?.timestamp, timestamp)
 
                 let tags = message?.tags ?? []
                 XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.file })?.value, "Module/File.swift")
                 XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.function })?.value, "doWork()")
                 XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.line })?.value, "42")
+                XCTAssertEqual(tags.first(where: { $0.identifier == LogTagIdentifiers.timestamp })?.value, "2025-11-15T10:30:00.123Z")
                 fulfill()
             }
         }

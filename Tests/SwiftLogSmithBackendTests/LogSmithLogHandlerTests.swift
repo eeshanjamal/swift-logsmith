@@ -468,6 +468,38 @@ final class LogSmithLogHandlerTests: XCTestCase {
         XCTAssertNotEqual(function, "log(event:)", "function should not be the bridge's own method")
     }
 
+    func testLog_WithBusyManagerQueue_ShouldTimestampTheSwiftLogCall() {
+        // Arrange — hold the manager's queue so that the message is processed well after the call.
+        let tagger = LogTagger()
+        expectCompletion(description: "timestamp tag registered") { fulfill in
+            tagger.addTag(InternalTag(internalTagType: .timestamp)) { _ in fulfill() }
+        }
+        mockLogger.tagger = tagger
+        manager.addLogger(newLogger: BackendMockLogger()) { _ in Thread.sleep(forTimeInterval: 0.3) }
+
+        // Act
+        var before = Date.distantPast
+        var after = Date.distantFuture
+        logAndWait { logger in
+            before = Date()
+            logger.info("when was I called?")
+            after = Date()
+        }
+
+        // Assert
+        let message = mockLogger.lastLogMessage
+        let timestamp = message?.timestamp ?? .distantPast
+        XCTAssertTrue((before...after).contains(timestamp), "The timestamp should be the moment of the swift-log call, not when the queue got to it")
+        let tagValue = message?.tags.first(where: { $0.identifier == LogTagIdentifiers.timestamp })?.value
+        XCTAssertEqual(tagValue.flatMap(Self.parseTimestampValue).map { abs($0.timeIntervalSince(timestamp)) < 0.001 }, true)
+    }
+
+    private static func parseTimestampValue(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value)
+    }
+
     //MARK: Handler value semantics
 
     func testMetadataSubscript_ShouldOnlyAffectItsOwnHandlerCopy() {

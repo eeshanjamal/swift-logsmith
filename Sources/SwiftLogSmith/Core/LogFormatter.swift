@@ -16,11 +16,12 @@ public import Foundation
 ///
 /// The default formatter produces logs in the following structure:
 /// ```
-/// Date [InternalTags] [LogType.symbolicValue] [ExternalTags] Message [Metadata]
+/// Timestamp [InternalTags] [LogType.symbolicValue] [ExternalTags] Message [Metadata]
 /// ```
+/// The timestamp is shown in local time with milliseconds and its UTC offset, when an ``InternalTagType/timestamp`` tag has been added.
 /// Metadata is written as a dictionary, sorted by key. An example log output using the default format:
 /// ```
-/// 2023-10-27 10:30:00 +0000 [function: login, line: 123] [D] User logged in ["source": "LoginVC"]
+/// 2026-11-15 15:37:38.994 +0530 [function: login, line: 123] [D] User logged in ["source": "LoginVC"]
 /// ```
 ///
 /// **Customization**
@@ -42,27 +43,33 @@ public import Foundation
 /// ```
 ///[D] [function: login, line: 123] The User logged in.
 /// ```
-/// >Note: Even though the `LogMessage` have the date & metadata as well but just because custom formatter doesn't include it. It will not appear in the final log output.
+/// >Note: Even though the `LogMessage` has a timestamp & metadata as well, they don't appear in the final log output because the custom formatter doesn't include them.
+/// A tag part with no `format` prints a ``InternalTagType/timestamp`` tag's own value, ISO 8601 in UTC; use the `format` closure's ``LogMessage/timestamp`` to show it differently.
 
 @objcMembers
 public final class LogFormatter: NSObject, Sendable {
     
     private let parts: [any LogPart]
     private static let logTypeValues = LogType.allCases.map { $0.stringValue }
-    
+    /// Shows the timestamp in ``default``: local time with milliseconds and its UTC offset.
+    private static let timestampDisplayFormatter = LockedDateFormatter(format: "yyyy-MM-dd HH:mm:ss.SSS Z", timeZone: .autoupdatingCurrent)
+
     /// A default formatter instance that provides a standard log structure.
     ///
     /// Format structure:
     /// ```
-    /// Date [InternalTags] [LogType.symbolicValue] [ExternalTags] Message [Metadata]
+    /// Timestamp [InternalTags] [LogType.symbolicValue] [ExternalTags] Message [Metadata]
     /// ```
     /// Example log output:
     /// ```
-    /// 2023-10-27 10:30:00 +0000 [function: login, line: 123] [D] User logged in ["source": "LoginVC"]
+    /// 2026-11-15 15:37:38.994 +0530 [function: login, line: 123] [D] User logged in ["source": "LoginVC"]
     /// ```
+    /// The timestamp appears when an ``InternalTag`` of type ``InternalTagType/timestamp`` is added, in local time with milliseconds and its UTC offset.
+    /// It's formatted from ``LogMessage/timestamp``; the tag's own ``Tag/value`` holds the same moment as ISO 8601 in UTC.
     public static var `default`: LogFormatter {
             Builder()
-            .addTagsPart(suffix: " ", filter: { $0.identifier == LogTagIdentifiers.date })
+            .addTagsPart(format: { _, message in timestampDisplayFormatter.string(from: message.timestamp) }, suffix: " ",
+                         filter: { $0.tagType == .internal && $0.identifier == LogTagIdentifiers.timestamp })
             .addTagsPart(prefix: "[", format: { tag, _ in "\(tag.identifier): \(tag.value)" }, separator: ", ", suffix: "] ", filter: { $0.tagType == .internal })
             .addTagsPart(prefix: "[", suffix: "] ", filter: { logTypeValues.contains($0.identifier) })
             .addTagsPart(prefix: "[", separator: ", ", suffix: "] ")
@@ -140,7 +147,7 @@ public final class LogFormatter: NSObject, Sendable {
         /// - Parameters:
         ///   - prefix: Text to be append before *this subset* of tags. By default, it will be an empty string.
         ///   - format: A closure to define specific format for *each individual tag*. It receives the tag and the ``LogMessage`` being formatted,
-        ///     so a tag's text can draw on the rest of the message (e.g., its ``LogMessage/logType``). By default, it will return the tag's value.
+        ///     so a tag's text can draw on the rest of the message (e.g., ``LogMessage/timestamp`` as a `Date` for a ``InternalTagType/timestamp`` tag). By default, it will return the tag's value.
         ///   - separator: Text to insert between tags (if multiple tags are captured by the filter).
         ///   - suffix: Text to be append after *this subset* of tags. By default, it will be an empty string.
         ///   - filter: A closure to select which tags should be included in this part.

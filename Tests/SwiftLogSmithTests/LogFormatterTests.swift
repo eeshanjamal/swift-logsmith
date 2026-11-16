@@ -15,10 +15,21 @@ final class MockLogger: ILogger, @unchecked Sendable {
     var formatter: LogFormatter = LogFormatter.default
     
     var lastLoggedMessage: String?
+    var lastLogMessage: LogMessage?
     
     func log(message: LogMessage, completion: (@Sendable (Bool) -> Void)?) {
+        lastLogMessage = message
         lastLoggedMessage = formatter.format(message: message)
         completion?(true)
+    }
+}
+
+extension ISO8601DateFormatter {
+    /// Reads the value of a timestamp tag: ISO 8601 with milliseconds.
+    static var withFractionalSeconds: ISO8601DateFormatter {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter
     }
 }
 
@@ -43,12 +54,11 @@ final class LogFormatterTests: XCTestCase {
         logger.formatter = LogFormatter.default // Use the default formatter
         
         // 1. Setup deterministic mock data
-        let mockDateString = "20251205103000123"
         let message = "This is a default message"
         let metadata: [String: String] = ["status": "ok"]
         
         // 2. Add tags in the order the default formatter expects to process them
-        LogSmith.addTag(ExternalTag(identifier: LogTagIdentifiers.date, value: mockDateString))
+        LogSmith.addTag(InternalTag(internalTagType: .timestamp))
         LogSmith.addTag(InternalTag(internalTagType: .file))
         LogSmith.addTag(InternalTag(internalTagType: .function))
         LogSmith.addTag(InternalTag(internalTagType: .line))
@@ -61,9 +71,10 @@ final class LogFormatterTests: XCTestCase {
             let line = #line + 1
             LogSmith.logI(message, metadata: metadata) { _ in
                 // 4. Construct the exact expected output string
-                // The default format is: Date | [file, function, line] | [LogType] | Message | Metadata
+                // The default format is: Timestamp | [file, function, line] | [LogType] | Message | Metadata
+                let expectedTimestamp = Self.displayTimestamp(logger.lastLogMessage?.timestamp ?? .distantPast)
                 let expectedSystemTags = "[file: \(fileName), function: \(functionName), line: \(line)]"
-                let expectedOutput = "\(mockDateString) \(expectedSystemTags) [I] \(message) [\"status\": \"ok\"]"
+                let expectedOutput = "\(expectedTimestamp) \(expectedSystemTags) [I] \(message) [\"status\": \"ok\"]"
                 
                 let loggedOutput = logger.lastLoggedMessage
                 
@@ -74,12 +85,75 @@ final class LogFormatterTests: XCTestCase {
         }
         
         // Cleanup
-        LogSmith.removeTag(identifier: "Date")
+        LogSmith.removeTag(identifier: LogTagIdentifiers.timestamp)
         LogSmith.removeTag(identifier: "file")
         LogSmith.removeTag(identifier: "function")
         LogSmith.removeTag(identifier: "line")
     }
-    
+
+    func testDefaultFormat_WithUserDateTag_ShouldPrintItWithExternalTags() throws {
+        // A date tag added by the user before the timestamp tag existed is no longer printed first, but it isn't lost.
+        let logger = mockLogger!
+        logger.formatter = LogFormatter.default
+        LogSmith.addTag(ExternalTag(identifier: "date", value: "legacy-date"))
+
+        expectCompletion(description: "A user date tag should appear with the external tags") { fulfill in
+            LogSmith.logI("Hello") { _ in
+                XCTAssertEqual(logger.lastLoggedMessage, "[I] [legacy-date] Hello")
+                fulfill()
+            }
+        }
+
+        LogSmith.removeTag(identifier: "date")
+    }
+
+    func testDefaultFormat_WithExternalTagNamedTimestamp_ShouldNotPrintItAsTheTimestamp() throws {
+        let logger = mockLogger!
+        logger.formatter = LogFormatter.default
+        LogSmith.addTag(ExternalTag(identifier: LogTagIdentifiers.timestamp, value: "not-a-time"))
+
+        expectCompletion(description: "Only an internal timestamp tag should take the timestamp position") { fulfill in
+            LogSmith.logI("Hello") { _ in
+                XCTAssertEqual(logger.lastLoggedMessage, "[I] [not-a-time] Hello")
+                fulfill()
+            }
+        }
+
+        LogSmith.removeTag(identifier: LogTagIdentifiers.timestamp)
+    }
+
+    func testTagsPart_WithoutFormatForTimestampTag_ShouldPrintISO8601ValueInUTC() throws {
+        let logger = mockLogger!
+        logger.formatter = LogFormatter.Builder()
+            .addTagsPart(filter: { $0.identifier == LogTagIdentifiers.timestamp })
+            .build()
+        LogSmith.addTag(InternalTag(internalTagType: .timestamp))
+
+        expectCompletion(description: "A tag part with no format should fall back to the stored UTC value") { fulfill in
+            LogSmith.logI("Hello") { _ in
+                let output = logger.lastLoggedMessage ?? ""
+                let timestamp = logger.lastLogMessage?.timestamp ?? .distantPast
+                XCTAssertTrue(output.hasSuffix("Z"), "The stored value should be in UTC: \(output)")
+                let parsed = ISO8601DateFormatter.withFractionalSeconds.date(from: output)
+                XCTAssertNotNil(parsed, "The stored value should be ISO 8601: \(output)")
+                XCTAssertLessThan(abs((parsed ?? .distantFuture).timeIntervalSince(timestamp)), 0.001)
+                fulfill()
+            }
+        }
+
+        LogSmith.removeTag(identifier: LogTagIdentifiers.timestamp)
+    }
+
+    /// Formats a date the way the default formatter shows the timestamp: local time with milliseconds and the UTC offset.
+    private static func displayTimestamp(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = .autoupdatingCurrent
+        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss.SSS Z"
+        return formatter.string(from: date)
+    }
+
     func testMessagePartFormat() throws {
         let logger = mockLogger!
         let emptyMessageFormatter = LogFormatter.Builder()

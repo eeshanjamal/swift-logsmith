@@ -188,6 +188,9 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     /// call sites need not provide them. Callers that receive source information at runtime — such as a logging facade
     /// bridging into this manager — can forward the original call site.
     ///
+    /// > Note: The time of the call is captured as the first step, on the caller's thread, before the message is queued. It becomes
+    /// ``LogMessage/timestamp`` and the value of any ``InternalTagType/timestamp`` tag, so it records when the log was called rather than when it was processed.
+    ///
     /// - Parameters:
     ///   - message: The raw message string.
     ///   - logType: The severity type of the log.
@@ -198,6 +201,16 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     ///   - line: The source line number where the log was called.
     ///   - completion: A closure that is called after all relevant loggers have processed the message. Returns `true` if all loggers succeeded.
     public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        // Captured here, on the caller's thread, before the hop onto the manager's queue.
+        let callSite = LogCallSite(fileId: fileId, function: function, line: line, timestamp: Date())
+        log(message: message, logType: logType, metadata: metadata, payload: payload, callSite: callSite, completion: completion)
+    }
+
+    /// Logs a message whose call site has already been captured.
+    ///
+    /// ``LogSmith`` and the `SwiftLogSmithBackend` module call this directly, because they capture the call site before their own queue hop or
+    /// metadata resolution; going through the public `log` would capture it again, later. It is `package`-scoped, so consumers of the library cannot call it.
+    package func log(message: String, logType: LogType, metadata: [String: String], payload: (any LogPayload)?, callSite: LogCallSite, completion: (@Sendable (Bool) -> Void)?) {
         queue.async {
             // Check Manager Level
             guard logType.logLevel.rawValue >= self.getMinimumLogLevel().rawValue && logType.rawValue >= self.getMinimumLogType().rawValue else {
@@ -205,7 +218,7 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
                 return
             }
 
-            self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerTags in
+            self.extractTags(logTagger: self.logTagger, logType: logType, callSite: callSite) { managerTags in
 
                 // Identify which loggers accept this log level
                 let activeItems = self.loggerItems.filter { loggerItem in
@@ -217,8 +230,8 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
 
                 activeItems.forEach { loggerItem in
                     group.enter()
-                    self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
-                        loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata, payload: payload)) { success in
+                    self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, callSite: callSite) { loggerTags in
+                        loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata, payload: payload, timestamp: callSite.timestamp)) { success in
                             tracker.record(success)
                             group.leave()
                         }
@@ -234,10 +247,10 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
 
     //MARK: Private operation API's
 
-    private func extractTags(logTagger: LogTagger?, logType: LogType, fileId: String, function: String, line: UInt, completion: @escaping (@Sendable([Tag]) -> Void)) {
+    private func extractTags(logTagger: LogTagger?, logType: LogType, callSite: LogCallSite, completion: @escaping (@Sendable([Tag]) -> Void)) {
         if let logTagger = logTagger {
             logTagger.logTags(logType: logType) { logTags in
-                completion(LogTagsExtractor().extract(logTags: logTags, fileId: fileId, function: function, line: line))
+                completion(LogTagsExtractor().extract(logTags: logTags, callSite: callSite))
             }
         }
         else {
@@ -301,28 +314,47 @@ private final class ResultTracker: @unchecked Sendable {
     }
 }
 
+/// The context of a single log call, captured on the caller's thread before any queue hop.
+///
+/// Everything here describes the call itself, so it has to be read where the call happens: by the time the message reaches a
+/// queue, the time has moved on. The values are immutable, so they can be carried across queues safely.
+package struct LogCallSite: Sendable {
+    /// The source file where the log was called.
+    package let fileId: String
+    /// The source function where the log was called.
+    package let function: String
+    /// The source line number where the log was called.
+    package let line: UInt
+    /// The moment the log was called.
+    package let timestamp: Date
+
+    package init(fileId: String, function: String, line: UInt, timestamp: Date) {
+        self.fileId = fileId
+        self.function = function
+        self.line = line
+        self.timestamp = timestamp
+    }
+}
+
 /// A helper class that uses the visitor pattern to convert ``LogTag`` protocol instances into concrete ``Tag`` data instances.
 ///
 /// > Note: This class is not internally thread-safe and is marked as `@unchecked Sendable` because it is intended for use exclusively within
 /// the single-threaded context of the `LogManager`'s serial dispatch queue. It shouldn't be shared across concurrent domains before actually making it thread-safe.
 private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
     
+    /// Writes ``InternalTagType/timestamp`` tag values: ISO 8601 in UTC, as ``InternalTagType/valueFormat`` documents.
+    private static let timestampValueFormatter = LockedDateFormatter(format: InternalTagType.timestampValueFormat, timeZone: TimeZone(identifier: "UTC")!)
+
     private var tags = [Tag]()
-    private var fileId = ""
-    private var function = ""
-    private var line = 0
+    private var callSite = LogCallSite(fileId: "", function: "", line: 0, timestamp: Date(timeIntervalSince1970: 0))
     
     /// Extracts and transforms a collection of ``LogTag`` into an array of ``Tag``.
     /// - Parameters:
     ///   - logTags: The array of ``LogTag`` to process.
-    ///   - fileId: The source file, used for any ``InternalTag`` of type `.file`.
-    ///   - function: The source function, used for any ``InternalTag`` of type `.function`.
-    ///   - line: The source line, used for any ``InternalTag`` of type `.line`.
+    ///   - callSite: The context of the log call, used for the values of ``InternalTag`` instances.
     /// - Returns: An array of concrete ``Tag`` objects.
-    func extract(logTags: [any LogTag], fileId: String, function: String, line: UInt) -> [Tag] {
-        self.fileId = fileId
-        self.function = function
-        self.line = Int(line)
+    func extract(logTags: [any LogTag], callSite: LogCallSite) -> [Tag] {
+        self.callSite = callSite
         tags.removeAll()
         logTags.forEach { logTag in
             logTag.visit(logTagVisitor: self)
@@ -338,13 +370,15 @@ private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
         let value: String
         switch internalTag.internalTagType {
         case .file:
-            value = fileId
+            value = callSite.fileId
         case .function:
-            value = function
+            value = callSite.function
         case .line:
-            value = "\(line)"
+            value = "\(callSite.line)"
         case .threadName:
             value = Utils.threadName()
+        case .timestamp:
+            value = LogTagsExtractor.timestampValueFormatter.string(from: callSite.timestamp)
         }
         tags.append(Tag(identifier: internalTag.identifier, value: value, tagType: .internal))
     }

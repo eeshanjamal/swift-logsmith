@@ -404,4 +404,56 @@ final class LogManagerTests: XCTestCase {
             }
         }
     }
+
+    func testLog_WithTimestampTags_ShouldShareOneMomentAcrossLoggersAndTagLevels() {
+        // Arrange — a manager-level timestamp tag, plus one on a second logger's own tagger.
+        let loggerTagger = LogTagger()
+        let secondLogger = SecondMockLogger(tagger: loggerTagger)
+        expectCompletion(description: "Register tags and logger", fulfillmentCount: 3) { fulfill in
+            sut.addTag(InternalTag(internalTagType: .timestamp)) { _ in fulfill() }
+            loggerTagger.addTag(InternalTag(internalTagType: .timestamp)) { _ in fulfill() }
+            sut.addLogger(newLogger: secondLogger) { _ in fulfill() }
+        }
+        let firstLogger = mockDefaultLogger
+
+        // Act & Assert
+        expectCompletion(description: "Both loggers should receive the log") { fulfill in
+            sut.log(message: "shared moment", logType: .info) { _ in
+                let first = firstLogger?.lastLoggedMessage
+                let second = secondLogger.lastLoggedMessage
+                XCTAssertNotNil(first?.timestamp)
+                XCTAssertEqual(first?.timestamp, second?.timestamp, "Every logger should get the same timestamp")
+
+                let values = (first?.tags ?? []).filter { $0.identifier == LogTagIdentifiers.timestamp }.map(\.value)
+                    + (second?.tags ?? []).filter { $0.identifier == LogTagIdentifiers.timestamp }.map(\.value)
+                XCTAssertEqual(values.count, 3, "One manager-level tag per logger, plus the second logger's own tag")
+                XCTAssertEqual(Set(values).count, 1, "Every timestamp tag should carry the same value: \(values)")
+
+                let parsed = values.first.flatMap { ISO8601DateFormatter.withFractionalSeconds.date(from: $0) }
+                XCTAssertLessThan(abs((parsed ?? .distantPast).timeIntervalSince(first?.timestamp ?? .distantFuture)), 0.001)
+                fulfill()
+            }
+        }
+    }
+
+    func testLog_WithBusyQueue_ShouldTimestampTheCallNotTheProcessing() {
+        // Arrange — the completion runs on the manager's queue, so sleeping in it holds back the log below.
+        sut.addLogger(newLogger: SecondMockLogger()) { _ in Thread.sleep(forTimeInterval: 0.3) }
+        let logger = mockDefaultLogger
+
+        // Act
+        let before = Date()
+        expectCompletion(description: "The log should be processed after the queue frees up") { fulfill in
+            sut.log(message: "called early", logType: .info) { _ in
+                let processedAt = Date()
+                let timestamp = logger?.lastLoggedMessage?.timestamp ?? .distantPast
+
+                // Assert
+                XCTAssertGreaterThanOrEqual(timestamp, before)
+                XCTAssertLessThan(timestamp.timeIntervalSince(before), 0.1, "The timestamp should be the moment of the call")
+                XCTAssertGreaterThan(processedAt.timeIntervalSince(timestamp), 0.2, "The log should have waited for the busy queue")
+                fulfill()
+            }
+        }
+    }
 }
