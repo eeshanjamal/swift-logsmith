@@ -457,6 +457,45 @@ final class LogManagerTests: XCTestCase {
         }
     }
 
+    //MARK: Logger list consistency
+
+    func testLog_ThenAddLogger_ShouldNotDeliverTheEarlierLogToTheNewLogger() {
+        // Arrange — hold the manager's tagger queue: addTag's completion runs on it, so sleeping there delays tag resolution.
+        let lateLogger = SecondMockLogger()
+        sut.addTag(ExternalTag(identifier: "Hold", value: "x")) { _ in Thread.sleep(forTimeInterval: 0.3) }
+
+        // Act — the log is queued first, then the logger is added while the log waits for its tags.
+        expectCompletion(description: "The earlier log should complete") { fulfill in
+            sut.log(message: "before the new logger", logType: .info) { _ in fulfill() }
+            sut.addLogger(newLogger: lateLogger)
+        }
+
+        // Assert
+        XCTAssertEqual(lateLogger.logCallCount, 0, "A logger added after a log call should not receive that log")
+    }
+
+    func testLog_WithConcurrentAddAndRemoveLogger_ShouldDeliverEveryLogToTheDefaultLogger() {
+        // Run with `swift test --sanitize=thread` to check that the logger list is only touched on the manager's queue.
+        let manager = sut!
+        let defaultLogger = mockDefaultLogger
+        let iterations = 200
+
+        expectCompletion(description: "Every log should complete", fulfillmentCount: iterations, timeout: 10) { fulfill in
+            DispatchQueue.concurrentPerform(iterations: iterations) { index in
+                let extraLogger = SecondMockLogger()
+                manager.addLogger(newLogger: extraLogger)
+                manager.log(message: "log \(index)", logType: .info) { _ in fulfill() }
+                manager.removeLogger(logger: extraLogger)
+            }
+        }
+
+        let count = expectation(description: "Read the count on the manager's queue")
+        manager.setMinimumLogType(.none)
+        manager.log(message: "last", logType: .info) { _ in count.fulfill() }
+        wait(for: [count], timeout: 5)
+        XCTAssertEqual(defaultLogger?.logCallCount, iterations + 1)
+    }
+
     //MARK: Caller and manager tags
 
     private func addCallerTags(to manager: LogManager) {

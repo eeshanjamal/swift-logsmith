@@ -218,12 +218,14 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
                 return
             }
 
-            self.extractTags(logTagger: self.logTagger, logType: logType, callSite: callSite) { managerTags in
+            // Identify which loggers accept this log level. This has to happen here, on the manager's queue: `loggerItems` is only
+            // safe to read on it, and taking the snapshot now means a logger added or removed after this call doesn't change who receives it.
+            let activeItems = self.loggerItems.filter { loggerItem in
+                logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue
+            }
 
-                // Identify which loggers accept this log level
-                let activeItems = self.loggerItems.filter { loggerItem in
-                    logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue
-                }
+            // The completion runs on the tagger's queue, so it must only use values captured above, never the manager's mutable state.
+            self.extractTags(logTagger: self.logTagger, logType: logType, callSite: callSite) { managerTags in
 
                 let group = DispatchGroup()
                 let tracker = ResultTracker()
