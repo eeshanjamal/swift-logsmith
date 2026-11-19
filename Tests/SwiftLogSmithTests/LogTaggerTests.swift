@@ -165,16 +165,6 @@ final class LogTaggerTests: XCTestCase {
         XCTAssertEqual(timestampTag.internalTagType, .timestamp)
     }
 
-    func testInternalTagType_InitWithIdentifier_ShouldRoundTripEveryStringValue() {
-        let allTypes: [InternalTagType] = [.file, .function, .line, .timestamp,
-                                           .callerThreadName, .callerQueueLabel, .callerName, .managerQueueLabel]
-        for type in allTypes {
-            XCTAssertEqual(InternalTagType(identifier: type.stringValue), type)
-        }
-        XCTAssertNil(InternalTagType(identifier: "unknown"))
-        XCTAssertNil(InternalTagType(identifier: "Timestamp"), "Identifiers are case-sensitive")
-    }
-
     func testValueFormat_ShouldOnlyExistForTimestamp() {
         XCTAssertEqual(InternalTagType.timestamp.valueFormat, "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX")
         XCTAssertEqual(InternalTagTypeUtils.valueFormat(for: .timestamp), InternalTagType.timestamp.valueFormat)
@@ -209,7 +199,6 @@ final class LogTaggerTests: XCTestCase {
         XCTAssertEqual(threadTag.identifier, LogTagIdentifiers.threadName)
         XCTAssertEqual(threadTag.logType, .notice)
         XCTAssertEqual(threadTag.internalTagType, .threadName)
-        XCTAssertEqual(InternalTagType(identifier: "threadName"), .threadName)
         XCTAssertNil(InternalTagType.threadName.valueFormat)
     }
 }

@@ -117,36 +117,6 @@ public final class LogTagIdentifiers: NSObject, Sendable {
     /// The pattern used by `DateFormatter` for the timestamp tag's value.
     internal static let timestampValueFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
 
-    /// Creates the internal tag type whose ``stringValue`` matches an identifier, or returns `nil` if none does.
-    ///
-    /// Use it to recover the tag type from a ``Tag`` while formatting. Check ``Tag/tagType`` first, because an ``ExternalTag`` can carry the same identifier.
-    /// - Parameter identifier: A tag identifier, such as ``LogTagIdentifiers/timestamp``.
-    public init?(identifier: String) {
-        switch identifier {
-        case LogTagIdentifiers.file:
-            self = .file
-        case LogTagIdentifiers.function:
-            self = .function
-        case LogTagIdentifiers.line:
-            self = .line
-        case InternalTagType.threadNameIdentifier:
-            // `.threadName`, by raw value so that the library itself doesn't trip the deprecation warning.
-            self = InternalTagType(rawValue: 3)!
-        case LogTagIdentifiers.timestamp:
-            self = .timestamp
-        case LogTagIdentifiers.callerThreadName:
-            self = .callerThreadName
-        case LogTagIdentifiers.callerQueueLabel:
-            self = .callerQueueLabel
-        case LogTagIdentifiers.callerName:
-            self = .callerName
-        case LogTagIdentifiers.managerQueueLabel:
-            self = .managerQueueLabel
-        default:
-            return nil
-        }
-    }
-
     /// The string value of the internal tag type.
     public var stringValue: String {
         switch self {
