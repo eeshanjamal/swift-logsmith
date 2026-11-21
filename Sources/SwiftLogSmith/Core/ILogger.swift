@@ -43,6 +43,10 @@ import Foundation
     /// An optional ``LogTagger`` instance used to append contextual tags automatically to log messages.
     ///
     /// If provided, the logger will use this tagger to inject tags (e.g., User ID, Session ID) out of the box into the final log output.
+    ///
+    /// These tags go to this logger only, after the tags of the ``LogManager`` it belongs to, which go to every logger. Duplicates between the two
+    /// levels aren't merged or removed: a tag added at both reaches this logger twice. Register context every logger needs on the manager, and
+    /// context only this logger needs here.
     @objc var tagger: LogTagger? { get }
     
     /// A ``LogFormatter`` instance that determines the final structure and content of the log message.

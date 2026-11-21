@@ -114,6 +114,21 @@ The library can also capture context about each log call for you, through an `In
 
 All of these are captured on the caller's thread before the log is queued, so the timestamp is the moment of the call and every logger sees the same values.
 
+#### Manager tags and logger tags
+
+Tags can live at two levels:
+
+- **Manager tags**, added with `LogSmith.addTag` (or `LogManager.addTag`), go to every logger. Use them for context every destination should show, such as the timestamp or the environment.
+- **Logger tags** live on a logger's own `LogTagger` and go to that logger only. Use them for context one destination needs, such as the caller's thread in a file log.
+
+```swift
+let fileTagger = LogTagger()
+fileTagger.addTag(InternalTag(internalTagType: .callerName))
+LogSmith.addLogger(newLogger: FileLogger(logTagger: fileTagger))
+```
+
+A logger receives the manager's tags followed by its own, and the library doesn't merge or remove duplicates between the two. Adding the same tag at both levels gives that logger both copies, which `LogFormatter.default` prints one after the other. Choosing the level is up to you: register a tag once, at the level it belongs to. Duplicates can also be deliberate, with a logger's custom formatter rendering each copy its own way.
+
 ### 2. File Logging
 
 Configure `FileLogger` to write logs to disk with automatic file management.
