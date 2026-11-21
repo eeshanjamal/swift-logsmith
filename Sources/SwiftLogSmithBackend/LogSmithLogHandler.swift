@@ -6,6 +6,7 @@
 //  SPDX-License-Identifier: MIT
 //
 
+import Foundation
 public import Logging
 public import SwiftLogSmith
 
@@ -148,6 +149,9 @@ public struct LogSmithLogHandler: LogHandler {
     }
 
     public func log(event: LogEvent) {
+        // swift-log calls this synchronously on the caller's thread, so this is the moment the swift-log call was made. Capture the
+        // whole call site now, before the metadata provider and `description` implementations below run user code that could change it.
+        let callSite = LogCallSite(fileId: event.file, function: event.function, line: event.line, timestamp: Date())
         let resolvedMetadata = Self.resolveMetadata(base: self.metadata,
                                                     provider: self.metadataProvider,
                                                     explicit: event.metadata,
@@ -168,17 +172,14 @@ public struct LogSmithLogHandler: LogHandler {
                                  logType: logType,
                                  metadata: flatMetadata,
                                  payload: payload,
-                                 fileId: event.file,
-                                 function: event.function,
-                                 line: event.line)
+                                 callSite: callSite)
         case .manager(let manager):
             manager.log(message: event.message.description,
                         logType: logType,
                         metadata: flatMetadata,
                         payload: payload,
-                        fileId: event.file,
-                        function: event.function,
-                        line: event.line)
+                        callSite: callSite,
+                        completion: nil)
         }
     }
 

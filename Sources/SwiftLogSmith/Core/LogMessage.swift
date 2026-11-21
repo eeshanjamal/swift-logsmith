@@ -9,6 +9,9 @@
 public import Foundation
 
 /// An enum that distinguishes between different implementations of ``LogTag`` by associating a type to each one.
+#if hasAttribute(nonexhaustive)
+@nonexhaustive(warn)
+#endif
 @objc public enum TagType: Int, Sendable {
     
     /// This type represent ``InternalTag`` implementation.
@@ -85,13 +88,20 @@ public final class LogMessage: NSObject, Sendable {
     ///
     /// Recover the concrete type with a conditional cast. See ``LogPayload``.
     public let payload: (any LogPayload)?
+    /// The moment the log was called.
+    ///
+    /// It's captured on the caller's thread before the message is queued, so it records when the log was called rather than when a logger received it.
+    /// Every `LogMessage` created from one log call carries the same value, whichever logger it goes to. It's always set, whether or not an
+    /// ``InternalTagType/timestamp`` tag was added; that tag only decides whether formatters show it.
+    public let timestamp: Date
 
-    internal init(message: String, logType: LogType, tags: [Tag], metadata: [String: String], payload: (any LogPayload)? = nil) {
+    internal init(message: String, logType: LogType, tags: [Tag], metadata: [String: String], payload: (any LogPayload)? = nil, timestamp: Date = Date()) {
         self.message = message
         self.logType = logType
         self.tags = tags
         self.metadata = metadata
         self.payload = payload
+        self.timestamp = timestamp
     }
 }
 

@@ -33,19 +33,36 @@ public import Foundation
 /// This class contains some common log tag identifiers (as static constants) which can be used when creating any ``LogTag`` compliant class instance.
 @objcMembers
 public final class LogTagIdentifiers: NSObject, Sendable {
-    /// Identifier for a timestamp tag.
+    /// Identifier for a date tag supplied by the user as an ``ExternalTag``.
+    ///
+    /// ``LogFormatter/default`` no longer prints a tag with this identifier first; it now appears with the other external tags.
+    @available(*, deprecated, message: "Add InternalTag(internalTagType: .timestamp) instead. The library captures the time of each log call itself, with milliseconds.")
     public static let date = "date"
+    /// Identifier for the ``InternalTagType/timestamp`` tag.
+    public static let timestamp = "timestamp"
     /// Identifier for a source file path tag.
     public static let file = "file"
     /// Identifier for a source function name tag.
     public static let function = "function"
     /// Identifier for a source line number tag.
     public static let line = "line"
-    /// Identifier for a thread name tag.
+    /// Identifier for the deprecated ``InternalTagType/threadName`` tag.
+    @available(*, deprecated, message: "Use callerThreadName, callerQueueLabel, callerName or managerQueueLabel instead.")
     public static let threadName = "threadName"
+    /// Identifier for the ``InternalTagType/callerThreadName`` tag.
+    public static let callerThreadName = "callerThreadName"
+    /// Identifier for the ``InternalTagType/callerQueueLabel`` tag.
+    public static let callerQueueLabel = "callerQueueLabel"
+    /// Identifier for the ``InternalTagType/callerName`` tag.
+    public static let callerName = "callerName"
+    /// Identifier for the ``InternalTagType/managerQueueLabel`` tag.
+    public static let managerQueueLabel = "managerQueueLabel"
 }
 
 /// This enum represents the different types of implicit tags an ``InternalTag`` instance can generate.
+#if hasAttribute(nonexhaustive)
+@nonexhaustive(warn)
+#endif
 @objc public enum InternalTagType: Int, Sendable {
     
     /// An internal tag type to represent the relative file source path.
@@ -60,11 +77,46 @@ public final class LogTagIdentifiers: NSObject, Sendable {
     ///
     /// It request the line number (within a file) where a log statement is written along with this tag type.
     case line
-    /// An internal tag type to represent the name of the current thread.
+    /// An internal tag type that used to represent the name of the current thread.
     ///
-    /// It request the name of the current thread where a log statement is executed along with this tag type.
+    /// Its value now matches ``callerName``: the calling thread's name if it has one, otherwise the label of the dispatch queue it's running.
+    /// Before, it reported a queue the library used internally rather than anything about the caller. Pick the replacement that fits:
+    /// ``callerThreadName``, ``callerQueueLabel``, ``callerName`` or ``managerQueueLabel``. Its identifier stays `threadName` until it's removed.
+    @available(*, deprecated, message: "Use callerThreadName, callerQueueLabel, callerName or managerQueueLabel instead.")
     case threadName
-    
+    /// An internal tag type to represent the moment a log statement is called.
+    ///
+    /// The time is captured on the caller's thread, before the message is queued, so it records when the log was called rather than when it was processed.
+    /// Every logger receives the same value for a given log call. The tag's ``Tag/value`` is written as ISO 8601 in UTC with milliseconds (see ``valueFormat``),
+    /// and ``LogFormatter/default`` shows it in local time with its UTC offset. The same moment is available as a `Date` through ``LogMessage/timestamp``.
+    case timestamp
+    /// An internal tag type to represent the name of the thread a log statement is called from.
+    ///
+    /// The value is the thread's name if it has one; `main` on the main thread; otherwise the thread's system-wide ID in hex (e.g., `0x1102e33`),
+    /// the same number Console and Instruments show. Threads that dispatch queues run on have no name, so a log called from a queue reports the thread ID.
+    /// It's captured on the caller's thread, before the message is queued.
+    case callerThreadName
+    /// An internal tag type to represent the label of the dispatch queue a log statement is called from.
+    ///
+    /// The value is the label of the queue the calling code is running on, as GCD reports it (e.g., `com.apple.main-thread` or `com.myapp.sync`).
+    /// A thread that isn't running a dispatch queue, such as a `Thread` you created yourself, still reports one of the system's global queues,
+    /// so for those threads ``callerThreadName`` or ``callerName`` is more telling. It's captured on the caller's thread, before the message is queued.
+    case callerQueueLabel
+    /// An internal tag type to represent the most telling name for where a log statement is called from.
+    ///
+    /// The value is the calling thread's name if it has one, otherwise the label of the dispatch queue it's running (see ``callerQueueLabel``).
+    /// A named `Thread` therefore reports its name, and code running on a queue reports the queue's label.
+    /// It's captured on the caller's thread, before the message is queued.
+    case callerName
+    /// An internal tag type to represent the ``LogManager`` that processed a log statement.
+    ///
+    /// The value is the label of the manager's serial queue, which is unique to each ``LogManager`` instance. Every log through ``LogSmith`` shares one value;
+    /// it tells logs apart when several ``LogManager`` instances are in use. A tag added to a logger's own ``LogTagger`` reports the manager that logger belongs to.
+    case managerQueueLabel
+
+    /// The pattern used by `DateFormatter` for the timestamp tag's value.
+    internal static let timestampValueFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX"
+
     /// The string value of the internal tag type.
     public var stringValue: String {
         switch self {
@@ -75,9 +127,38 @@ public final class LogTagIdentifiers: NSObject, Sendable {
         case .line:
             return LogTagIdentifiers.line
         case .threadName:
-            return LogTagIdentifiers.threadName
+            return InternalTagType.threadNameIdentifier
+        case .timestamp:
+            return LogTagIdentifiers.timestamp
+        case .callerThreadName:
+            return LogTagIdentifiers.callerThreadName
+        case .callerQueueLabel:
+            return LogTagIdentifiers.callerQueueLabel
+        case .callerName:
+            return LogTagIdentifiers.callerName
+        case .managerQueueLabel:
+            return LogTagIdentifiers.managerQueueLabel
         }
     }
+
+    /// The `DateFormatter` pattern a tag type's ``Tag/value`` is written in, or `nil` if its value isn't a formatted date.
+    ///
+    /// Only ``timestamp`` has one: `yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX`, an ISO 8601 date and time in UTC with milliseconds (e.g., `2026-11-15T10:07:38.994Z`).
+    ///
+    /// To read such a value back as a `Date`, use a `DateFormatter` with this pattern and `Locale(identifier: "en_US_POSIX")`; other locales can change the calendar
+    /// or digits the pattern produces. An `ISO8601DateFormatter` with `.withInternetDateTime` and `.withFractionalSeconds` reads it as well. Inside a ``LogFormatter``,
+    /// the format closure of `addTagsPart` receives the ``LogMessage``, whose ``LogMessage/timestamp`` holds the same moment as a `Date` with no parsing needed.
+    public var valueFormat: String? {
+        switch self {
+        case .timestamp:
+            return InternalTagType.timestampValueFormat
+        case .file, .function, .line, .threadName, .callerThreadName, .callerQueueLabel, .callerName, .managerQueueLabel:
+            return nil
+        }
+    }
+
+    /// The identifier of ``threadName``, kept here so the library can use it without referring to the deprecated ``LogTagIdentifiers/threadName``.
+    internal static let threadNameIdentifier = "threadName"
 }
 
 /// A utility class providing Objective-C compatible access to `InternalTagType` properties.
@@ -89,6 +170,13 @@ public final class InternalTagTypeUtils: NSObject, Sendable {
     /// - Returns: The string representation (e.g., "file" for .file).
     public static func stringValue(for tagType: InternalTagType) -> String {
         return tagType.stringValue
+    }
+
+    /// Returns the `DateFormatter` pattern of an `InternalTagType`'s value, or `nil` if its value isn't a formatted date.
+    /// - Parameter tagType: The `InternalTagType` enum.
+    /// - Returns: The pattern (e.g., `yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX` for .timestamp). See ``InternalTagType/valueFormat``.
+    public static func valueFormat(for tagType: InternalTagType) -> String? {
+        return tagType.valueFormat
     }
 }
 
@@ -108,7 +196,7 @@ public final class InternalTagTypeUtils: NSObject, Sendable {
 
 /// A concrete implementation of ``LogTag`` for creating user-defined, dynamic data tags.
 ///
-/// This type of log tag can be used to capture contextual information that is specific to your application's domain. The value of the tag can be provided as a static string or as a dynamic closure (which is evaluated each time the log is processed). This is useful for capturing transient state like the current date, user ID or network status.
+/// This type of log tag can be used to capture contextual information that is specific to your application's domain. The value of the tag can be provided as a static string or as a dynamic closure (which is evaluated each time the log is processed). This is useful for capturing transient state like the user ID or network status. For the time of a log call, use an ``InternalTag`` of type ``InternalTagType/timestamp`` instead: a closure runs when the log is processed, not when it was called.
 ///
 /// **Usage:**
 /// ```swift
@@ -116,7 +204,7 @@ public final class InternalTagTypeUtils: NSObject, Sendable {
 /// let envTag = ExternalTag(identifier: "environment", value: "staging")
 ///
 /// // Dynamic value
-/// let userTag = ExternalTag(identifier: LogTagIdentifiers.date, valueProvider: { Date().description })
+/// let userTag = ExternalTag(identifier: "userId", valueProvider: { Session.current.userId })
 /// ```
 @objcMembers
 public final class ExternalTag: NSObject, LogTag {

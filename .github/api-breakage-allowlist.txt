@@ -43,3 +43,20 @@ API breakage: func LogSmith.logC(_:metadata:fileId:function:line:completion:) ha
 API breakage: func LogSmith.logF(_:metadata:fileId:function:line:completion:) has been renamed to func logF(_:metadata:payload:fileId:function:line:completion:)
 API breakage: enumelement LogLevel.undefined has been removed
 API breakage: enumelement LogLevel.default has been removed
+API breakage: func LogFormatter.Builder.addTagsPart(prefix:format:separator:suffix:filter:) has parameter 1 type change from (SwiftLogSmith.Tag) -> Swift.String to (SwiftLogSmith.Tag, SwiftLogSmith.LogMessage) -> Swift.String
+API breakage: enum TagType is now with @nonexhaustive
+API breakage: enum InternalTagType is now with @nonexhaustive
+API breakage: enumelement InternalTagType.timestamp has been added as a new enum case
+API breakage: enumelement InternalTagType.callerThreadName has been added as a new enum case
+API breakage: enumelement InternalTagType.callerQueueLabel has been added as a new enum case
+API breakage: enumelement InternalTagType.callerName has been added as a new enum case
+API breakage: enumelement InternalTagType.managerQueueLabel has been added as a new enum case
+API breakage: enum LogFileSortKey is now with @nonexhaustive
+API breakage: enum SortOrder is now with @nonexhaustive
+API breakage: enum FileLoggerManager.ErrorCode is now with @nonexhaustive
+API breakage: func LogSmith.logInternal(_:logType:metadata:payload:fileId:function:line:completion:) has parameter 7 type change from ((Swift.Bool) -> Swift.Void)? to Foundation.Date
+API breakage: func LogSmith.logInternal(_:logType:metadata:payload:fileId:function:line:completion:) has removed default argument from parameter 7
+API breakage: enum LogType is now with @nonexhaustive
+API breakage: enum LogLevel is now with @nonexhaustive
+API breakage: func LogSmith.logInternal(_:logType:metadata:payload:fileId:function:line:completion:) has been renamed to func logInternal(_:logType:metadata:payload:fileId:function:line:timestamp:completion:)
+API breakage: extension LogType is now with @nonexhaustive

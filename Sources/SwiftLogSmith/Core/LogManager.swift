@@ -188,6 +188,9 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     /// call sites need not provide them. Callers that receive source information at runtime — such as a logging facade
     /// bridging into this manager — can forward the original call site.
     ///
+    /// > Note: The time of the call is captured as the first step, on the caller's thread, before the message is queued. It becomes
+    /// ``LogMessage/timestamp`` and the value of any ``InternalTagType/timestamp`` tag, so it records when the log was called rather than when it was processed.
+    ///
     /// - Parameters:
     ///   - message: The raw message string.
     ///   - logType: The severity type of the log.
@@ -198,6 +201,16 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
     ///   - line: The source line number where the log was called.
     ///   - completion: A closure that is called after all relevant loggers have processed the message. Returns `true` if all loggers succeeded.
     public func log(message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String = #fileID, function: String = #function, line: UInt = #line, completion: (@Sendable (Bool) -> Void)? = nil) {
+        // Captured here, on the caller's thread, before the hop onto the manager's queue.
+        let callSite = LogCallSite(fileId: fileId, function: function, line: line, timestamp: Date())
+        log(message: message, logType: logType, metadata: metadata, payload: payload, callSite: callSite, completion: completion)
+    }
+
+    /// Logs a message whose call site has already been captured.
+    ///
+    /// ``LogSmith`` and the `SwiftLogSmithBackend` module call this directly, because they capture the call site before their own queue hop or
+    /// metadata resolution; going through the public `log` would capture it again, later. It is `package`-scoped, so consumers of the library cannot call it.
+    package func log(message: String, logType: LogType, metadata: [String: String], payload: (any LogPayload)?, callSite: LogCallSite, completion: (@Sendable (Bool) -> Void)?) {
         queue.async {
             // Check Manager Level
             guard logType.logLevel.rawValue >= self.getMinimumLogLevel().rawValue && logType.rawValue >= self.getMinimumLogType().rawValue else {
@@ -205,20 +218,22 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
                 return
             }
 
-            self.extractTags(logTagger: self.logTagger, logType: logType, fileId: fileId, function: function, line: line) { managerTags in
+            // Identify which loggers accept this log level. This has to happen here, on the manager's queue: `loggerItems` is only
+            // safe to read on it, and taking the snapshot now means a logger added or removed after this call doesn't change who receives it.
+            let activeItems = self.loggerItems.filter { loggerItem in
+                logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue
+            }
 
-                // Identify which loggers accept this log level
-                let activeItems = self.loggerItems.filter { loggerItem in
-                    logType.logLevel.rawValue >= loggerItem.getMinimumLogLevel().rawValue && logType.rawValue >= loggerItem.getMinimumLogType().rawValue
-                }
+            // The completion runs on the tagger's queue, so it must only use values captured above, never the manager's mutable state.
+            self.extractTags(logTagger: self.logTagger, logType: logType, callSite: callSite) { managerTags in
 
                 let group = DispatchGroup()
                 let tracker = ResultTracker()
 
                 activeItems.forEach { loggerItem in
                     group.enter()
-                    self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, fileId: fileId, function: function, line: line) { loggerTags in
-                        loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata, payload: payload)) { success in
+                    self.extractTags(logTagger: loggerItem.logger.tagger, logType: logType, callSite: callSite) { loggerTags in
+                        loggerItem.logger.log(message: LogMessage(message: message, logType: logType, tags: managerTags+loggerTags, metadata: metadata, payload: payload, timestamp: callSite.timestamp)) { success in
                             tracker.record(success)
                             group.leave()
                         }
@@ -234,10 +249,11 @@ public final class LogManager: NSObject, LogManagerOperations, LogTaggerOperatio
 
     //MARK: Private operation API's
 
-    private func extractTags(logTagger: LogTagger?, logType: LogType, fileId: String, function: String, line: UInt, completion: @escaping (@Sendable([Tag]) -> Void)) {
+    private func extractTags(logTagger: LogTagger?, logType: LogType, callSite: LogCallSite, completion: @escaping (@Sendable([Tag]) -> Void)) {
         if let logTagger = logTagger {
+            let managerQueueLabel = queue.label
             logTagger.logTags(logType: logType) { logTags in
-                completion(LogTagsExtractor().extract(logTags: logTags, fileId: fileId, function: function, line: line))
+                completion(LogTagsExtractor(callSite: callSite, managerQueueLabel: managerQueueLabel).extract(logTags: logTags))
             }
         }
         else {
@@ -301,28 +317,83 @@ private final class ResultTracker: @unchecked Sendable {
     }
 }
 
-/// A helper class that uses the visitor pattern to convert ``LogTag`` protocol instances into concrete ``Tag`` data instances.
+/// The context of a single log call, captured on the caller's thread before any queue hop.
 ///
-/// > Note: This class is not internally thread-safe and is marked as `@unchecked Sendable` because it is intended for use exclusively within
-/// the single-threaded context of the `LogManager`'s serial dispatch queue. It shouldn't be shared across concurrent domains before actually making it thread-safe.
-private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
-    
-    private var tags = [Tag]()
-    private var fileId = ""
-    private var function = ""
-    private var line = 0
-    
-    /// Extracts and transforms a collection of ``LogTag`` into an array of ``Tag``.
+/// Everything here describes the call itself, so it has to be read where the call happens: by the time the message reaches a
+/// queue, the time has moved on. The values are immutable, so they can be carried across queues safely.
+package struct LogCallSite: Sendable {
+    /// The source file where the log was called.
+    package let fileId: String
+    /// The source function where the log was called.
+    package let function: String
+    /// The source line number where the log was called.
+    package let line: UInt
+    /// The moment the log was called.
+    package let timestamp: Date
+    /// The value of a ``InternalTagType/callerThreadName`` tag: the calling thread's name, `main`, or its thread ID in hex.
+    package let threadName: String
+    /// The value of a ``InternalTagType/callerQueueLabel`` tag: the label of the dispatch queue the caller is running.
+    package let queueLabel: String
+    /// The value of a ``InternalTagType/callerName`` tag: the calling thread's name if it has one, otherwise ``queueLabel``.
+    package let callerName: String
+
+    /// Captures the context of a log call. Call it on the caller's thread, since it also reads the current thread and queue.
     /// - Parameters:
-    ///   - logTags: The array of ``LogTag`` to process.
-    ///   - fileId: The source file, used for any ``InternalTag`` of type `.file`.
-    ///   - function: The source function, used for any ``InternalTag`` of type `.function`.
-    ///   - line: The source line, used for any ``InternalTag`` of type `.line`.
-    /// - Returns: An array of concrete ``Tag`` objects.
-    func extract(logTags: [any LogTag], fileId: String, function: String, line: UInt) -> [Tag] {
+    ///   - fileId: The source file where the log was called.
+    ///   - function: The source function where the log was called.
+    ///   - line: The source line number where the log was called.
+    ///   - timestamp: The moment the log was called.
+    package init(fileId: String, function: String, line: UInt, timestamp: Date) {
         self.fileId = fileId
         self.function = function
-        self.line = Int(line)
+        self.line = line
+        self.timestamp = timestamp
+
+        let ownName = Thread.current.name.flatMap { $0.isEmpty ? nil : $0 }
+        let queueLabel = DispatchQueue.currentLabel ?? ""
+        self.queueLabel = queueLabel
+        self.threadName = ownName ?? (Thread.isMainThread ? "main" : LogCallSite.currentThreadID())
+        self.callerName = ownName ?? queueLabel
+    }
+
+    /// The system-wide ID of the current thread in hex, as Console and Instruments show it (e.g., `0x1102e33`).
+    private static func currentThreadID() -> String {
+        var threadID: UInt64 = 0
+        #if swift(>=6.2)
+            _ = unsafe pthread_threadid_np(nil, &threadID)
+        #else
+            _ = pthread_threadid_np(nil, &threadID)
+        #endif
+        return "0x" + String(threadID, radix: 16)
+    }
+}
+
+/// A helper class that uses the visitor pattern to convert ``LogTag`` protocol instances into concrete ``Tag`` data instances.
+///
+/// > Note: This class is not internally thread-safe and is marked as `@unchecked Sendable` because each instance handles a single extraction,
+/// on the serial queue of the ``LogTagger`` being read. It shouldn't be shared across concurrent domains before actually making it thread-safe.
+private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
+    
+    /// Writes ``InternalTagType/timestamp`` tag values: ISO 8601 in UTC, as ``InternalTagType/valueFormat`` documents.
+    private static let timestampValueFormatter = LockedDateFormatter(format: InternalTagType.timestampValueFormat, timeZone: TimeZone(identifier: "UTC")!)
+
+    private var tags = [Tag]()
+    private let callSite: LogCallSite
+    private let managerQueueLabel: String
+
+    /// Creates an extractor for one log call.
+    /// - Parameters:
+    ///   - callSite: The context of the log call, used for the values of ``InternalTag`` instances.
+    ///   - managerQueueLabel: The label of the ``LogManager`` queue processing the log, used for any ``InternalTag`` of type `.managerQueueLabel`.
+    init(callSite: LogCallSite, managerQueueLabel: String) {
+        self.callSite = callSite
+        self.managerQueueLabel = managerQueueLabel
+    }
+    
+    /// Extracts and transforms a collection of ``LogTag`` into an array of ``Tag``.
+    /// - Parameter logTags: The array of ``LogTag`` to process.
+    /// - Returns: An array of concrete ``Tag`` objects.
+    func extract(logTags: [any LogTag]) -> [Tag] {
         tags.removeAll()
         logTags.forEach { logTag in
             logTag.visit(logTagVisitor: self)
@@ -338,32 +409,26 @@ private final class LogTagsExtractor: LogTagVisitor, @unchecked Sendable {
         let value: String
         switch internalTag.internalTagType {
         case .file:
-            value = fileId
+            value = callSite.fileId
         case .function:
-            value = function
+            value = callSite.function
         case .line:
-            value = "\(line)"
-        case .threadName:
-            value = Utils.threadName()
+            value = "\(callSite.line)"
+        case .threadName, .callerName:
+            value = callSite.callerName
+        case .timestamp:
+            value = LogTagsExtractor.timestampValueFormatter.string(from: callSite.timestamp)
+        case .callerThreadName:
+            value = callSite.threadName
+        case .callerQueueLabel:
+            value = callSite.queueLabel
+        case .managerQueueLabel:
+            value = managerQueueLabel
         }
         tags.append(Tag(identifier: internalTag.identifier, value: value, tagType: .internal))
     }
 }
 
-/// A private utility class for helper functions.
-private final class Utils: Sendable {
-    
-    /// Returns the name of the current thread or dispatch queue.
-    static func threadName() -> String {
-        if Thread.isMainThread {
-            return "main"
-        }
-        else {
-            return DispatchQueue.currentLabel ?? Thread.current.name ?? "unknown"
-        }
-    }
-    
-}
 
 /// A private wrapper that holds an ``ILogger`` instance along with its specific configuration.
 @objcMembers

@@ -404,4 +404,227 @@ final class LogManagerTests: XCTestCase {
             }
         }
     }
+
+    func testLog_WithTimestampTags_ShouldShareOneMomentAcrossLoggersAndTagLevels() {
+        // Arrange — a manager-level timestamp tag, plus one on a second logger's own tagger.
+        let loggerTagger = LogTagger()
+        let secondLogger = SecondMockLogger(tagger: loggerTagger)
+        expectCompletion(description: "Register tags and logger", fulfillmentCount: 3) { fulfill in
+            sut.addTag(InternalTag(internalTagType: .timestamp)) { _ in fulfill() }
+            loggerTagger.addTag(InternalTag(internalTagType: .timestamp)) { _ in fulfill() }
+            sut.addLogger(newLogger: secondLogger) { _ in fulfill() }
+        }
+        let firstLogger = mockDefaultLogger
+
+        // Act & Assert
+        expectCompletion(description: "Both loggers should receive the log") { fulfill in
+            sut.log(message: "shared moment", logType: .info) { _ in
+                let first = firstLogger?.lastLoggedMessage
+                let second = secondLogger.lastLoggedMessage
+                XCTAssertNotNil(first?.timestamp)
+                XCTAssertEqual(first?.timestamp, second?.timestamp, "Every logger should get the same timestamp")
+
+                let values = (first?.tags ?? []).filter { $0.identifier == LogTagIdentifiers.timestamp }.map(\.value)
+                    + (second?.tags ?? []).filter { $0.identifier == LogTagIdentifiers.timestamp }.map(\.value)
+                XCTAssertEqual(values.count, 3, "One manager-level tag per logger, plus the second logger's own tag")
+                XCTAssertEqual(Set(values).count, 1, "Every timestamp tag should carry the same value: \(values)")
+
+                let parsed = values.first.flatMap { ISO8601DateFormatter.withFractionalSeconds.date(from: $0) }
+                XCTAssertLessThan(abs((parsed ?? .distantPast).timeIntervalSince(first?.timestamp ?? .distantFuture)), 0.001)
+                fulfill()
+            }
+        }
+    }
+
+    func testLog_WithBusyQueue_ShouldTimestampTheCallNotTheProcessing() {
+        // Arrange — the completion runs on the manager's queue, so sleeping in it holds back the log below.
+        sut.addLogger(newLogger: SecondMockLogger()) { _ in Thread.sleep(forTimeInterval: 0.3) }
+        let logger = mockDefaultLogger
+
+        // Act
+        let before = Date()
+        expectCompletion(description: "The log should be processed after the queue frees up") { fulfill in
+            sut.log(message: "called early", logType: .info) { _ in
+                let processedAt = Date()
+                let timestamp = logger?.lastLoggedMessage?.timestamp ?? .distantPast
+
+                // Assert
+                XCTAssertGreaterThanOrEqual(timestamp, before)
+                XCTAssertLessThan(timestamp.timeIntervalSince(before), 0.1, "The timestamp should be the moment of the call")
+                XCTAssertGreaterThan(processedAt.timeIntervalSince(timestamp), 0.2, "The log should have waited for the busy queue")
+                fulfill()
+            }
+        }
+    }
+
+    //MARK: Logger list consistency
+
+    func testLog_ThenAddLogger_ShouldNotDeliverTheEarlierLogToTheNewLogger() {
+        // Arrange — hold the manager's tagger queue: addTag's completion runs on it, so sleeping there delays tag resolution.
+        let lateLogger = SecondMockLogger()
+        sut.addTag(ExternalTag(identifier: "Hold", value: "x")) { _ in Thread.sleep(forTimeInterval: 0.3) }
+
+        // Act — the log is queued first, then the logger is added while the log waits for its tags.
+        expectCompletion(description: "The earlier log should complete") { fulfill in
+            sut.log(message: "before the new logger", logType: .info) { _ in fulfill() }
+            sut.addLogger(newLogger: lateLogger)
+        }
+
+        // Assert
+        XCTAssertEqual(lateLogger.logCallCount, 0, "A logger added after a log call should not receive that log")
+    }
+
+    func testLog_WithConcurrentAddAndRemoveLogger_ShouldDeliverEveryLogToTheDefaultLogger() {
+        // Run with `swift test --sanitize=thread` to check that the logger list is only touched on the manager's queue.
+        let manager = sut!
+        let defaultLogger = mockDefaultLogger
+        let iterations = 200
+
+        expectCompletion(description: "Every log should complete", fulfillmentCount: iterations, timeout: 10) { fulfill in
+            DispatchQueue.concurrentPerform(iterations: iterations) { index in
+                let extraLogger = SecondMockLogger()
+                manager.addLogger(newLogger: extraLogger)
+                manager.log(message: "log \(index)", logType: .info) { _ in fulfill() }
+                manager.removeLogger(logger: extraLogger)
+            }
+        }
+
+        let count = expectation(description: "Read the count on the manager's queue")
+        manager.setMinimumLogType(.none)
+        manager.log(message: "last", logType: .info) { _ in count.fulfill() }
+        wait(for: [count], timeout: 5)
+        XCTAssertEqual(defaultLogger?.logCallCount, iterations + 1)
+    }
+
+    //MARK: Caller and manager tags
+
+    private func addCallerTags(to manager: LogManager) {
+        let types: [InternalTagType] = [.callerThreadName, .callerQueueLabel, .callerName, .managerQueueLabel]
+        expectCompletion(description: "Register caller tags", fulfillmentCount: types.count) { fulfill in
+            types.forEach { manager.addTag(InternalTag(internalTagType: $0)) { _ in fulfill() } }
+        }
+    }
+
+    private static func value(of identifier: String, in message: LogMessage?) -> String? {
+        message?.tags.first(where: { $0.identifier == identifier })?.value
+    }
+
+    private static func currentThreadID() -> String {
+        var threadID: UInt64 = 0
+        pthread_threadid_np(nil, &threadID)
+        return "0x" + String(threadID, radix: 16)
+    }
+
+    func testLog_FromNamedThread_ShouldReportTheThreadName() {
+        addCallerTags(to: sut)
+        let logger = mockDefaultLogger
+        let manager = sut!
+
+        expectCompletion(description: "Log from a named thread") { fulfill in
+            let thread = Thread {
+                manager.log(message: "from a thread", logType: .info) { _ in
+                    let message = logger?.lastLoggedMessage
+                    XCTAssertEqual(Self.value(of: LogTagIdentifiers.callerThreadName, in: message), "LogSmithWorker")
+                    XCTAssertEqual(Self.value(of: LogTagIdentifiers.callerName, in: message), "LogSmithWorker")
+                    XCTAssertFalse(Self.value(of: LogTagIdentifiers.callerQueueLabel, in: message)?.isEmpty ?? true)
+                    fulfill()
+                }
+            }
+            thread.name = "LogSmithWorker"
+            thread.start()
+        }
+    }
+
+    func testLog_FromQueue_ShouldReportTheQueueLabelAndThreadID() {
+        addCallerTags(to: sut)
+        let logger = mockDefaultLogger
+        let manager = sut!
+        let queue = DispatchQueue(label: "com.swiftlogsmith.tests.caller")
+
+        expectCompletion(description: "Log from a dispatch queue") { fulfill in
+            queue.async {
+                let expectedThreadID = Self.currentThreadID()
+                manager.log(message: "from a queue", logType: .info) { _ in
+                    let message = logger?.lastLoggedMessage
+                    XCTAssertEqual(Self.value(of: LogTagIdentifiers.callerQueueLabel, in: message), "com.swiftlogsmith.tests.caller")
+                    XCTAssertEqual(Self.value(of: LogTagIdentifiers.callerName, in: message), "com.swiftlogsmith.tests.caller")
+                    XCTAssertEqual(Self.value(of: LogTagIdentifiers.callerThreadName, in: message), expectedThreadID,
+                                   "A queue's thread has no name, so the thread ID should be reported")
+                    fulfill()
+                }
+            }
+        }
+    }
+
+    func testLog_FromMainThread_ShouldReportMain() {
+        addCallerTags(to: sut)
+        let logger = mockDefaultLogger
+        let expectedThreadName = Thread.main.name.flatMap { $0.isEmpty ? nil : $0 } ?? "main"
+
+        expectCompletion(description: "Log from the main thread") { fulfill in
+            XCTAssertTrue(Thread.isMainThread)
+            sut.log(message: "from main", logType: .info) { _ in
+                let message = logger?.lastLoggedMessage
+                XCTAssertEqual(Self.value(of: LogTagIdentifiers.callerThreadName, in: message), expectedThreadName)
+                XCTAssertEqual(Self.value(of: LogTagIdentifiers.callerQueueLabel, in: message), "com.apple.main-thread")
+                fulfill()
+            }
+        }
+    }
+
+    func testLog_WithManagerQueueLabelTag_ShouldIdentifyTheManager() {
+        // Arrange — the tag on the manager and on a logger's own tagger, plus a second manager for comparison.
+        let loggerTagger = LogTagger()
+        let secondLogger = SecondMockLogger(tagger: loggerTagger)
+        let otherLogger = SecondMockLogger()
+        let otherManager = LogManager(identifier: "OtherManager", defaultLogger: otherLogger)
+        expectCompletion(description: "Register tags and logger", fulfillmentCount: 4) { fulfill in
+            sut.addTag(InternalTag(internalTagType: .managerQueueLabel)) { _ in fulfill() }
+            loggerTagger.addTag(InternalTag(internalTagType: .managerQueueLabel)) { _ in fulfill() }
+            sut.addLogger(newLogger: secondLogger) { _ in fulfill() }
+            otherManager.addTag(InternalTag(internalTagType: .managerQueueLabel)) { _ in fulfill() }
+        }
+        let firstLogger = mockDefaultLogger
+
+        // Act
+        expectCompletion(description: "Both managers log", fulfillmentCount: 2) { fulfill in
+            sut.log(message: "first manager", logType: .info) { _ in fulfill() }
+            otherManager.log(message: "second manager", logType: .info) { _ in fulfill() }
+        }
+
+        // Assert
+        let labels = (secondLogger.lastLoggedMessage?.tags ?? []).filter { $0.identifier == LogTagIdentifiers.managerQueueLabel }.map(\.value)
+        let firstLabel = Self.value(of: LogTagIdentifiers.managerQueueLabel, in: firstLogger?.lastLoggedMessage)
+        let otherLabel = Self.value(of: LogTagIdentifiers.managerQueueLabel, in: otherLogger.lastLoggedMessage)
+        XCTAssertEqual(labels.count, 2, "One manager-level tag and the logger's own tag")
+        XCTAssertEqual(Set(labels + [firstLabel ?? ""]).count, 1, "Every tag from one manager should carry the same label")
+        XCTAssertTrue(firstLabel?.hasPrefix("com.swift.logsmith.logman.") ?? false)
+        XCTAssertNotNil(otherLabel)
+        XCTAssertNotEqual(firstLabel, otherLabel, "Each manager should report its own label")
+    }
+
+    /// Marked deprecated so that it can exercise the deprecated `threadName` without warnings.
+    @available(*, deprecated)
+    func testLog_WithDeprecatedThreadNameTag_ShouldReportTheCallerName() {
+        let logger = mockDefaultLogger
+        let manager = sut!
+        expectCompletion(description: "Register tags", fulfillmentCount: 2) { fulfill in
+            manager.addTag(InternalTag(internalTagType: .threadName)) { _ in fulfill() }
+            manager.addTag(InternalTag(internalTagType: .callerName)) { _ in fulfill() }
+        }
+
+        expectCompletion(description: "Log from a named thread") { fulfill in
+            let thread = Thread {
+                manager.log(message: "legacy", logType: .info) { _ in
+                    let message = logger?.lastLoggedMessage
+                    XCTAssertEqual(Self.value(of: LogTagIdentifiers.threadName, in: message), "LegacyWorker")
+                    XCTAssertEqual(Self.value(of: LogTagIdentifiers.threadName, in: message),
+                                   Self.value(of: LogTagIdentifiers.callerName, in: message))
+                    fulfill()
+                }
+            }
+            thread.name = "LegacyWorker"
+            thread.start()
+        }
+    }
 }

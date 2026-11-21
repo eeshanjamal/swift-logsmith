@@ -88,15 +88,46 @@ LogSmith.logD("User tapped button")
 Tags allow you to attach persistent context to your logs, making filtering and debugging easier.
 
 ```swift
+// Add the time of each log call, captured by the library with milliseconds
+LogSmith.addTag(InternalTag(internalTagType: .timestamp))
+
 // Add a static tag
 LogSmith.addTag(ExternalTag(identifier: "Env", value: "Staging"))
 
-// Add a dynamic tag (evaluated at runtime)
-LogSmith.addTag(ExternalTag(identifier: "Date", valueProvider: { Date().description }))
+// Add a dynamic tag (evaluated each time a log is processed)
+LogSmith.addTag(ExternalTag(identifier: "User", valueProvider: { Session.current.userId }))
 
-// Output: [Env: Staging] [2026-02-24 10:30:00 +0000] [I] User logged in
+// Output: 2026-11-15 15:37:38.994 +0530 [I] [Staging, 123] User logged in
 LogSmith.logI("User logged in")
 ```
+
+The library can also capture context about each log call for you, through an `InternalTag`:
+
+| `InternalTagType` | Value |
+|---|---|
+| `.timestamp` | When the log was called. Shown by the default formatter in local time with its UTC offset; the tag's own value is ISO 8601 in UTC (`2026-11-15T10:07:38.994Z`). |
+| `.file`, `.function`, `.line` | Where the log was called. |
+| `.callerThreadName` | The calling thread's name, `main`, or its thread ID in hex. |
+| `.callerQueueLabel` | The label of the dispatch queue the caller is running. |
+| `.callerName` | The calling thread's name if it has one, otherwise the queue label. |
+| `.managerQueueLabel` | The `LogManager` that processed the log, to tell several managers apart. |
+
+All of these are captured on the caller's thread before the log is queued, so the timestamp is the moment of the call and every logger sees the same values.
+
+#### Manager tags and logger tags
+
+Tags can live at two levels:
+
+- **Manager tags**, added with `LogSmith.addTag` (or `LogManager.addTag`), go to every logger. Use them for context every destination should show, such as the timestamp or the environment.
+- **Logger tags** live on a logger's own `LogTagger` and go to that logger only. Use them for context one destination needs, such as the caller's thread in a file log.
+
+```swift
+let fileTagger = LogTagger()
+fileTagger.addTag(InternalTag(internalTagType: .callerName))
+LogSmith.addLogger(newLogger: FileLogger(logTagger: fileTagger))
+```
+
+A logger receives the manager's tags followed by its own, and the library doesn't merge or remove duplicates between the two. Adding the same tag at both levels gives that logger both copies, which `LogFormatter.default` prints one after the other. Choosing the level is up to you: register a tag once, at the level it belongs to. Duplicates can also be deliberate, with a logger's custom formatter rendering each copy its own way.
 
 ### 2. File Logging
 
@@ -141,6 +172,18 @@ LogSmith.log("Network status is stable")
 
 // Expected Output:
 // [Production] 📢 Network status is stable
+```
+
+A tag part's `format` closure also receives the `LogMessage`, so a tag can be rendered from the rest of the message. For example, to show the timestamp as seconds since the epoch:
+
+```swift
+let epochFormatter = LogFormatter.Builder()
+    .addTagsPart(format: { _, message in String(format: "%.3f", message.timestamp.timeIntervalSince1970) },
+                 suffix: " ",
+                 filter: { $0.tagType == .internal && $0.identifier == LogTagIdentifiers.timestamp })
+    .addMessagePart()
+    .build()
+// Output: 1794737258.994 Network status is stable
 ```
 
 ### 4. Using as a swift-log Backend
