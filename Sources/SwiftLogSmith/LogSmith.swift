@@ -376,6 +376,22 @@ public final class LogSmith: NSObject, LogManagerOperations, LogTaggerOperations
     package static func logInternal(_ message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, fileId: String, function: String, line: UInt, timestamp: Date, completion: (@Sendable (Bool) -> Void)? = nil) {
         // Captured before the hop onto LogSmith's queue: by the time the queue runs this block, the caller has moved on.
         let callSite = LogCallSite(fileId: fileId, function: function, line: line, timestamp: timestamp)
+        logInternal(message, logType: logType, metadata: metadata, payload: payload, callSite: callSite, completion: completion)
+    }
+
+    /// Logs a message with a call site its caller has already captured.
+    ///
+    /// For a caller that runs code of its own between receiving the log call and handing it over, such as the `SwiftLogSmithBackend` handler
+    /// resolving metadata. Capturing the ``LogCallSite`` first keeps that code from changing what the caller tags record.
+    ///
+    /// - Parameters:
+    ///   - message: The message string to log.
+    ///   - logType: The severity type of the log.
+    ///   - metadata: A dictionary of key-value pairs to attach to this specific log message.
+    ///   - payload: Optional structured context to attach to the resulting ``LogMessage``. See ``LogPayload``.
+    ///   - callSite: The context of the log call, captured on the caller's thread when the log was called.
+    ///   - completion: An optional completion handler called when the log has been processed by all active loggers. Returns `true` if successful.
+    package static func logInternal(_ message: String, logType: LogType, metadata: [String: String] = Dictionary(), payload: (any LogPayload)? = nil, callSite: LogCallSite, completion: (@Sendable (Bool) -> Void)? = nil) {
         shared.queue.async { shared.defaultManager.log(message: message, logType: logType, metadata: metadata, payload: payload, callSite: callSite, completion: completion) }
     }
 
